@@ -1,0 +1,81 @@
+.pageWrapper {
+  min-height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  height: 4rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-6);
+  background-color: var(--background);
+}
+
+.logoContainer {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.logoIcon {
+  color: var(--primary);
+  width: 24px;
+  height: 24px;
+}
+
+.logoText {
+  font-family: var(--font-family-heading);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-8) var(--spacing-4);
+}
+
+.contentContainer {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
+.intro {
+  text-align: center;
+}
+
+.title {
+  font-family: var(--font-family-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--foreground);
+  margin-bottom: var(--spacing-2);
+}
+
+.subtitle {
+  color: var(--muted-foreground);
+  font-size: 1.125rem;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-4);
+}
+
+.skipLink {
+  color: var(--muted-foreground);
+}
+
+.skipLink:hover {
+  color: var(--foreground);
+}

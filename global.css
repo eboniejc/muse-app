@@ -1,0 +1,143 @@
+@import url(https://fonts.googleapis.com/css2?family=Manrope:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap);
+@import url(https://fonts.googleapis.com/css2?family=Space+Grotesk:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap);
+@import url(https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap);
+@import url(https://fonts.googleapis.com/css2?family=Permanent+Marker:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap);
+
+
+
+
+:root {
+  /* Content layers */
+  --z-content-low: 10; /* Minor elevated content */
+  --z-content: 20; /* Standard elevated content */
+  --z-content-high: 30; /* Important content that needs prominence */
+
+  /* Navigation layers */
+  --z-nav-low: 100; /* Secondary navigation components */
+  --z-nav: 200; /* Primary navigation bars */
+  --z-nav-sticky: 300; /* Sticky navigation elements */
+
+  /* Overlay layers */
+  --z-overlay: 400;
+
+  --z-spotlight: 1000; /* Tutorial spotlights/guided help */
+
+  /* System layers */
+  --z-critical: 2000; /* Critical system notifications */
+
+  /* spacing */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-7: 1.75rem;
+  --spacing-8: 2rem;
+  --spacing-9: 2.25rem;
+  --spacing-10: 2.5rem;
+  --spacing-11: 2.75rem;
+  --spacing-12: 3rem;
+  --spacing-13: 3.25rem;
+  --spacing-14: 3.5rem;
+  --spacing-15: 3.75rem;
+  --spacing-16: 4rem;
+  --spacing-17: 4.25rem;
+  --spacing-18: 4.5rem;
+  --spacing-19: 4.75rem;
+  --spacing-20: 5rem;
+}
+
+:root {
+  /* Dark Mode Only Design - Defaulting root to dark values */
+  
+  /* Backgrounds - Deep, matte, industrial darks - Neutralized for Orange pop */
+  --background: hsl(0 0% 5%); /* Pure dark, removed blue tint */
+  --foreground: hsl(0 0% 95%); /* Off-white for text */
+
+  /* Surfaces - Slightly elevated, mimicking hardware casing */
+  --surface: hsl(0 0% 9%); 
+  --surface-foreground: hsl(0 0% 90%);
+  
+  --sidebar: hsl(0 0% 7%);
+  --sidebar-foreground: hsl(0 0% 80%);
+  
+  --card: hsl(0 0% 11%);
+  --card-foreground: hsl(0 0% 95%);
+  
+  --popup: hsl(0 0% 13%);
+  --popup-foreground: hsl(0 0% 98%);
+
+  /* Primary - MUSE Orange (Vibrant, Energetic) */
+  --primary: hsl(25 100% 50%); /* #FF6B00 equivalent */
+  --primary-foreground: hsl(0 0% 100%);
+
+  /* Secondary - Industrial White/Silver (High Contrast Signals) */
+  --secondary: hsl(0 0% 90%);
+  --secondary-foreground: hsl(0 0% 5%);
+
+  /* Accent - Recording Red (Alerts/Urgent/Recording) */
+  --accent: hsl(0 80% 60%);
+  --accent-foreground: hsl(0 0% 100%);
+
+  /* Muted - For inactive states/faders */
+  --muted: hsl(0 0% 20%);
+  --muted-foreground: hsl(0 0% 50%);
+
+  /* Functional Colors */
+  --success: hsl(150 70% 45%);
+  --success-foreground: hsl(0 0% 100%);
+  
+  --error: hsl(0 70% 50%);
+  --error-foreground: hsl(0 0% 100%);
+  
+  --warning: hsl(40 90% 50%);
+  --warning-foreground: hsl(0 0% 5%);
+  
+  --info: hsl(200 80% 50%);
+  --info-foreground: hsl(0 0% 100%);
+  --info-hover: hsl(200 80% 60%);
+  --info-active: hsl(200 80% 40%);
+
+  /* Borders - Subtle, technical, neutral */
+  --border: hsl(0 0% 20%);
+
+  /* Font Families */
+  --font-family-base: 'Manrope', sans-serif;
+  --font-family-heading: 'Space Grotesk', sans-serif;
+  --font-family-monospace: 'JetBrains Mono', monospace; /* For time/dates */
+  --font-family-cursive: 'Permanent Marker', cursive; /* Rarely used, maybe for instructor notes */
+
+  /* Shadows - Very subtle, mostly for depth in popups */
+  --shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.5);
+  --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.5), 0 2px 4px -1px hsl(0 0% 0% / 0.3);
+  --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.6), 0 4px 6px -2px hsl(0 0% 0% / 0.4);
+  --shadow-focus: 0 0 0 2px hsl(0 0% 4%), 0 0 0 4px var(--primary);
+
+  /* Radius - Technical, sharp, hardware-like */
+  --radius-sm: 2px;
+  --radius: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-full: 9999px; 
+
+  /* Animation - Snappy, instant response like a button press */
+  --animation-duration-fast: 100ms;
+  --animation-duration-normal: 200ms;
+  --animation-duration-slow: 350ms;
+
+  /* Chart Colors - MUSE Palette */
+  --chart-color-1: hsl(25 100% 50%);  /* Orange */
+  --chart-color-2: hsl(0 0% 90%);     /* White */
+  --chart-color-3: hsl(0 80% 60%);    /* Red */
+  --chart-color-4: hsl(45 90% 50%);   /* Gold */
+  --chart-color-5: hsl(200 80% 50%);  /* Blue (Complementary) */
+  
+  /* Special Effects */
+  --glass-panel: hsl(0 0% 12% / 0.7);
+  --led-glow: 0 0 10px var(--primary);
+}
+
+.dark {
+  /* Empty block as the design is dark-mode native/exclusive */
+}

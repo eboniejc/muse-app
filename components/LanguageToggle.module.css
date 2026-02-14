@@ -1,0 +1,27 @@
+.toggle {
+  font-family: var(--font-family-monospace);
+  color: var(--muted-foreground);
+  transition: color var(--animation-duration-fast) ease;
+  min-width: 4rem;
+}
+
+.toggle:hover {
+  color: var(--foreground);
+  background-color: var(--surface);
+}
+
+.flag {
+  font-size: 1.1rem;
+  line-height: 1;
+  filter: grayscale(0.2);
+  transition: filter var(--animation-duration-fast) ease;
+}
+
+.toggle:hover .flag {
+  filter: grayscale(0);
+}
+
+.code {
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}

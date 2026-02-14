@@ -1,0 +1,97 @@
+.section {
+  padding: var(--spacing-16) var(--spacing-6);
+  background-color: var(--background);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-8);
+  flex-wrap: wrap;
+  gap: var(--spacing-4);
+}
+
+.heading {
+  font-family: var(--font-family-heading);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--spacing-6);
+}
+
+.card {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--animation-duration-normal);
+}
+
+.card:hover {
+  border-color: var(--primary);
+}
+
+.cardContent {
+  padding: var(--spacing-6);
+}
+
+.badges {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+.courseTitle {
+  font-family: var(--font-family-heading);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-2);
+  color: var(--card-foreground);
+}
+
+.price {
+  font-family: var(--font-family-monospace);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin-bottom: var(--spacing-4);
+}
+
+.courseDesc {
+  color: var(--muted-foreground);
+  margin-bottom: var(--spacing-6);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.instructor {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: 0.875rem;
+  padding-top: var(--spacing-4);
+  border-top: 1px solid var(--border);
+}
+
+.instructorLabel {
+  color: var(--muted-foreground);
+}
+
+.instructorName {
+  color: var(--foreground);
+  font-weight: 500;
+}

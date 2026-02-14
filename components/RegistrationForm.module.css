@@ -1,0 +1,133 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  padding: var(--spacing-6);
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.sectionTitle {
+  font-family: var(--font-family-heading);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: var(--spacing-2);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--spacing-2);
+}
+
+.row {
+  display: flex;
+  gap: var(--spacing-4);
+}
+
+.halfWidth {
+  flex: 1;
+}
+
+.dateButton {
+  width: 100%;
+  justify-content: space-between;
+  font-weight: 400;
+}
+
+.mutedText {
+  color: var(--muted-foreground);
+}
+
+.calendarIcon {
+  margin-left: auto;
+  height: 1rem;
+  width: 1rem;
+  opacity: 0.5;
+}
+
+.calendarPopover {
+  width: auto;
+  padding: 0;
+}
+
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.radioItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--surface);
+  transition: border-color var(--animation-duration-fast);
+}
+
+.radioItem:hover {
+  border-color: var(--primary);
+}
+
+.radioLabel {
+  cursor: pointer;
+  flex: 1;
+  font-size: 0.9375rem;
+}
+
+.bankDetails {
+  margin-top: var(--spacing-2);
+  padding-top: var(--spacing-4);
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  animation: slideDown var(--animation-duration-normal) ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-4);
+}
+
+.submitButton {
+  width: 100%;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.loading {
+  text-align: center;
+  padding: var(--spacing-8);
+  color: var(--muted-foreground);
+}
+
+@media (max-width: 640px) {
+  .row {
+    flex-direction: column;
+    gap: var(--spacing-4);
+  }
+}

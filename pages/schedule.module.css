@@ -1,0 +1,177 @@
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  height: calc(100vh - 100px); /* Adjust based on header/padding */
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  margin-bottom: var(--spacing-6);
+}
+
+.title {
+  font-family: var(--font-family-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.subtitle {
+  color: var(--muted-foreground);
+}
+
+.layout {
+  display: flex;
+  gap: var(--spacing-6);
+  flex: 1;
+  min-height: 0; /* Important for nested scrolling */
+}
+
+.sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-right: var(--spacing-2);
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  margin-bottom: var(--spacing-4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.main {
+  flex: 1;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-6);
+  overflow-y: auto;
+}
+
+.calendarSection {
+  display: flex;
+  gap: var(--spacing-8);
+  height: 100%;
+}
+
+.calendarWrapper {
+  flex-shrink: 0;
+}
+
+.calendar {
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.dayView {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  padding-left: var(--spacing-8);
+}
+
+.dayHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-6);
+  padding-bottom: var(--spacing-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.dayHeader h3 {
+  font-family: var(--font-family-heading);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.bookingsList {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  overflow-y: auto;
+}
+
+.bookingCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-3) var(--spacing-4);
+  background-color: var(--surface);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--primary);
+}
+
+.bookingTime {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-family: var(--font-family-monospace);
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.bookingInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+.bookingUser {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+
+.cancelBtn {
+  color: var(--muted-foreground);
+}
+
+.cancelBtn:hover {
+  color: var(--error);
+  background-color: color-mix(in srgb, var(--error) 10%, transparent);
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted-foreground);
+  font-style: italic;
+  background-color: var(--surface);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+@media (max-width: 1024px) {
+  .layout {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    max-height: 300px;
+  }
+
+  .calendarSection {
+    flex-direction: column;
+  }
+
+  .dayView {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: var(--spacing-6);
+  }
+}

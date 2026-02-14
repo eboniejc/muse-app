@@ -1,0 +1,2 @@
+// NOTE: this file is generated and should not be manually modified
+export const ONESIGNAL_APP_ID = "os_v2_app_i63pr33aqnho3nzpojmu2h3f3rtm5w2cfqre5kfbebvo23qyx63w3ch4wjbf5zmbw5nkaw4oeb7j6ubf7rkb4v6gibkazvw5uxbzily";

@@ -1,0 +1,204 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.welcome {
+  margin-bottom: var(--spacing-8);
+}
+
+.greeting {
+  font-family: var(--font-family-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--foreground);
+  margin-bottom: var(--spacing-2);
+}
+
+.name {
+  color: var(--primary);
+}
+
+.date {
+  color: var(--muted-foreground);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--spacing-6);
+  margin-bottom: var(--spacing-8);
+}
+
+.statCard {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-6);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+.statIcon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-full);
+  background-color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.statInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.statValue {
+  font-family: var(--font-family-monospace);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--spacing-8);
+}
+
+.section {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-6);
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-6);
+}
+
+.sectionTitle {
+  font-family: var(--font-family-heading);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--card-foreground);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.listItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-3);
+  background-color: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  transition: border-color var(--animation-duration-fast);
+}
+
+.listItem:hover {
+  border-color: var(--border);
+}
+
+.dateBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  background-color: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.day {
+  font-family: var(--font-family-monospace);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.month {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.itemDetails {
+  flex: 1;
+}
+
+.itemTitle {
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: var(--spacing-1);
+}
+
+.itemSub {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.statusIndicator {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.statusIndicator[data-status="confirmed"] {
+  background-color: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+.statusIndicator[data-status="cancelled"] {
+  background-color: var(--error);
+}
+
+.progressBar {
+  height: 4px;
+  background-color: var(--muted);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: var(--spacing-2);
+}
+
+.progressFill {
+  height: 100%;
+  background-color: var(--secondary);
+  border-radius: var(--radius-full);
+}
+
+.percentage {
+  font-family: var(--font-family-monospace);
+  font-weight: 700;
+  color: var(--secondary);
+}
+
+.emptyState {
+  text-align: center;
+  padding: var(--spacing-8);
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+}

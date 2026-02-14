@@ -1,0 +1,136 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.sidebar {
+  display: none;
+  width: 280px;
+  background-color: var(--sidebar);
+  border-right: 1px solid var(--border);
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-nav);
+}
+
+.logoContainer {
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-6);
+  gap: var(--spacing-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.logoIcon {
+  color: var(--primary);
+  width: 24px;
+  height: 24px;
+}
+
+.logoText {
+  font-family: var(--font-family-heading);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.nav {
+  padding: var(--spacing-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all var(--animation-duration-fast);
+}
+
+.navItem:hover {
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
+.navItem.active {
+  background-color: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+}
+
+.mainWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.header {
+  height: 4rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-6);
+  background-color: var(--background);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav-sticky);
+}
+
+.mobileMenu {
+  display: block;
+}
+
+.headerRight {
+  margin-left: auto;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.content {
+  flex: 1;
+  padding: var(--spacing-6);
+  overflow-y: auto;
+}
+
+.mobileSheet {
+  background-color: var(--sidebar);
+  border-right: 1px solid var(--border);
+}
+
+.mobileNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  margin-top: var(--spacing-6);
+}
+
+@media (min-width: 1024px) {
+  .sidebar {
+    display: flex;
+  }
+
+  .mainWrapper {
+    margin-left: 280px;
+  }
+
+  .mobileMenu {
+    display: none;
+  }
+}

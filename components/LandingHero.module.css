@@ -1,0 +1,86 @@
+.hero {
+  position: relative;
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-8);
+  overflow: hidden;
+  background-color: var(--background);
+}
+
+.content {
+  position: relative;
+  z-index: var(--z-content);
+  text-align: center;
+  max-width: 800px;
+}
+
+.headline {
+  font-family: var(--font-family-heading);
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 900;
+  line-height: 0.9;
+  margin-bottom: var(--spacing-6);
+  letter-spacing: -0.04em;
+  color: var(--foreground);
+}
+
+.tagline {
+  font-family: var(--font-family-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: calc(var(--spacing-6) * -1);
+  margin-bottom: var(--spacing-6);
+  letter-spacing: -0.02em;
+}
+
+.highlight {
+  color: var(--primary);
+  text-shadow: 0 0 30px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.subheadline {
+  font-size: 1.25rem;
+  color: var(--muted-foreground);
+  margin-bottom: var(--spacing-8);
+  line-height: 1.6;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ctaGroup {
+  display: flex;
+  gap: var(--spacing-4);
+  justify-content: center;
+}
+
+.visual {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 15%, transparent) 0%, transparent 70%);
+  filter: blur(60px);
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.1;
+  mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+}
