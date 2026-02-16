@@ -74,12 +74,15 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.1.8
         version: 1.2.8(@types/react@19.2.13)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@supabase/supabase-js':
+        specifier: ^2.95.3
+        version: 2.95.3
       '@tanstack/react-query':
         specifier: ^5.76.1
         version: 5.90.20(react@19.2.4)
       '@vitejs/plugin-react-swc':
         specifier: ^3.8.0
-        version: 3.11.0(vite@6.4.1(tsx@4.21.0))
+        version: 3.11.0(vite@6.4.1(@types/node@25.2.3)(tsx@4.21.0))
       bcryptjs:
         specifier: 3.0.3
         version: 3.0.3
@@ -166,10 +169,10 @@ importers:
         version: 4.21.0
       vite:
         specifier: ^6.2.0
-        version: 6.4.1(tsx@4.21.0)
+        version: 6.4.1(@types/node@25.2.3)(tsx@4.21.0)
       vite-plugin-node-polyfills:
         specifier: ^0.24.0
-        version: 0.24.0(rollup@4.57.1)(vite@6.4.1(tsx@4.21.0))
+        version: 0.24.0(rollup@4.57.1)(vite@6.4.1(@types/node@25.2.3)(tsx@4.21.0))
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -1263,6 +1266,30 @@ packages:
   '@standard-schema/utils@0.3.0':
     resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
 
+  '@supabase/auth-js@2.95.3':
+    resolution: {integrity: sha512-vD2YoS8E2iKIX0F7EwXTmqhUpaNsmbU6X2R0/NdFcs02oEfnHyNP/3M716f3wVJ2E5XHGiTFXki6lRckhJ0Thg==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/functions-js@2.95.3':
+    resolution: {integrity: sha512-uTuOAKzs9R/IovW1krO0ZbUHSJnsnyJElTXIRhjJTqymIVGcHzkAYnBCJqd7468Fs/Foz1BQ7Dv6DCl05lr7ig==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/postgrest-js@2.95.3':
+    resolution: {integrity: sha512-LTrRBqU1gOovxRm1vRXPItSMPBmEFqrfTqdPTRtzOILV4jPSueFz6pES5hpb4LRlkFwCPRmv3nQJ5N625V2Xrg==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/realtime-js@2.95.3':
+    resolution: {integrity: sha512-D7EAtfU3w6BEUxDACjowWNJo/ZRo7sDIuhuOGKHIm9FHieGeoJV5R6GKTLtga/5l/6fDr2u+WcW/m8I9SYmaIw==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/storage-js@2.95.3':
+    resolution: {integrity: sha512-4GxkJiXI3HHWjxpC3sDx1BVrV87O0hfX+wvJdqGv67KeCu+g44SPnII8y0LL/Wr677jB7tpjAxKdtVWf+xhc9A==}
+    engines: {node: '>=20.0.0'}
+
+  '@supabase/supabase-js@2.95.3':
+    resolution: {integrity: sha512-Fukw1cUTQ6xdLiHDJhKKPu6svEPaCEDvThqCne3OaQyZvuq2qjhJAd91kJu3PXLG18aooCgYBaB6qQz35hhABg==}
+    engines: {node: '>=20.0.0'}
+
   '@swc/core-darwin-arm64@1.15.11':
     resolution: {integrity: sha512-QoIupRWVH8AF1TgxYyeA5nS18dtqMuxNwchjBIwJo3RdwLEFiJq6onOx9JAxHtuPwUkIVuU2Xbp+jCJ7Vzmgtg==}
     engines: {node: '>=10'}
@@ -1380,11 +1407,20 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
+  '@types/node@25.2.3':
+    resolution: {integrity: sha512-m0jEgYlYz+mDJZ2+F4v8D1AyQb+QzsNqRuI7xg1VQX/KlKS0qT9r1Mo16yo5F/MtifXFgaofIFsdFMox2SxIbQ==}
+
+  '@types/phoenix@1.6.7':
+    resolution: {integrity: sha512-oN9ive//QSBkf19rfDv45M7eZPi0eEXylht2OLEXicu5b4KoQ1OzXIw+xDSGWxSxe1JmepRR/ZH283vsu518/Q==}
+
   '@types/react@19.2.13':
     resolution: {integrity: sha512-KkiJeU6VbYbUOp5ITMIc7kBfqlYkKA5KhEHVrGMmUUMt7NeaZg65ojdPk+FtNrBAOXNVM5QM72jnADjM+XVRAQ==}
 
   '@types/warning@3.0.3':
     resolution: {integrity: sha512-D1XC7WK8K+zZEveUPY+cf4+kgauk8N4eHr/XIHXGlGYkHLud6hK9lYfZk1ry1TNh798cZUCgb6MqGEG8DkJt6Q==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@vitejs/plugin-react-swc@3.11.0':
     resolution: {integrity: sha512-YTJCGFdNMHCMfjODYtxRNVAYmTWQ1Lb8PulP/2/f/oEEtglw8oKxKIZmmRkyXrVrHfsKOaVkAc3NT9/dMutO5w==}
@@ -1761,6 +1797,10 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  iceberg-js@0.8.1:
+    resolution: {integrity: sha512-1dhVQZXhcHje7798IVM+xoo/1ZdVfzOMIc8/rgVSijRK38EDqOJoGula9N/8ZI5RD8QTxNQtK/Gozpr+qUqRRA==}
+    engines: {node: '>=20.0.0'}
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
@@ -2287,6 +2327,9 @@ packages:
     peerDependencies:
       react: '>=15.0.0'
 
+  undici-types@7.16.0:
+    resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
+
   url@0.11.4:
     resolution: {integrity: sha512-oCwdVC7mTuWiPyjLUz/COz5TLk6wgp0RCsN+wHZ2Ekneac9w8uuV0njcbbie2ME+Vs+d6duwmYuR3HgQXs1fOg==}
     engines: {node: '>= 0.4'}
@@ -2383,6 +2426,18 @@ packages:
   which-typed-array@1.1.20:
     resolution: {integrity: sha512-LYfpUkmqwl0h9A2HL09Mms427Q1RZWuOHsukfVcKRq9q95iQxdw0ix1JQrqbcDR9PH1QDwf5Qo8OZb5lksZ8Xg==}
     engines: {node: '>= 0.4'}
+
+  ws@8.19.0:
+    resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
 
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
@@ -3245,6 +3300,44 @@ snapshots:
 
   '@standard-schema/utils@0.3.0': {}
 
+  '@supabase/auth-js@2.95.3':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/functions-js@2.95.3':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/postgrest-js@2.95.3':
+    dependencies:
+      tslib: 2.8.1
+
+  '@supabase/realtime-js@2.95.3':
+    dependencies:
+      '@types/phoenix': 1.6.7
+      '@types/ws': 8.18.1
+      tslib: 2.8.1
+      ws: 8.19.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
+  '@supabase/storage-js@2.95.3':
+    dependencies:
+      iceberg-js: 0.8.1
+      tslib: 2.8.1
+
+  '@supabase/supabase-js@2.95.3':
+    dependencies:
+      '@supabase/auth-js': 2.95.3
+      '@supabase/functions-js': 2.95.3
+      '@supabase/postgrest-js': 2.95.3
+      '@supabase/realtime-js': 2.95.3
+      '@supabase/storage-js': 2.95.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@swc/core-darwin-arm64@1.15.11':
     optional: true
 
@@ -3330,17 +3423,27 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
+  '@types/node@25.2.3':
+    dependencies:
+      undici-types: 7.16.0
+
+  '@types/phoenix@1.6.7': {}
+
   '@types/react@19.2.13':
     dependencies:
       csstype: 3.2.3
 
   '@types/warning@3.0.3': {}
 
-  '@vitejs/plugin-react-swc@3.11.0(vite@6.4.1(tsx@4.21.0))':
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 25.2.3
+
+  '@vitejs/plugin-react-swc@3.11.0(vite@6.4.1(@types/node@25.2.3)(tsx@4.21.0))':
     dependencies:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@swc/core': 1.15.11
-      vite: 6.4.1(tsx@4.21.0)
+      vite: 6.4.1(@types/node@25.2.3)(tsx@4.21.0)
     transitivePeerDependencies:
       - '@swc/helpers'
 
@@ -3812,6 +3915,8 @@ snapshots:
   i18next@25.8.4:
     dependencies:
       '@babel/runtime': 7.28.6
+
+  iceberg-js@0.8.1: {}
 
   ieee754@1.2.1: {}
 
@@ -4429,6 +4534,8 @@ snapshots:
       react: 19.2.4
       react-lifecycles-compat: 3.0.4
 
+  undici-types@7.16.0: {}
+
   url@0.11.4:
     dependencies:
       punycode: 1.4.1
@@ -4480,15 +4587,15 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite-plugin-node-polyfills@0.24.0(rollup@4.57.1)(vite@6.4.1(tsx@4.21.0)):
+  vite-plugin-node-polyfills@0.24.0(rollup@4.57.1)(vite@6.4.1(@types/node@25.2.3)(tsx@4.21.0)):
     dependencies:
       '@rollup/plugin-inject': 5.0.5(rollup@4.57.1)
       node-stdlib-browser: 1.3.1
-      vite: 6.4.1(tsx@4.21.0)
+      vite: 6.4.1(@types/node@25.2.3)(tsx@4.21.0)
     transitivePeerDependencies:
       - rollup
 
-  vite@6.4.1(tsx@4.21.0):
+  vite@6.4.1(@types/node@25.2.3)(tsx@4.21.0):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.3)
@@ -4497,6 +4604,7 @@ snapshots:
       rollup: 4.57.1
       tinyglobby: 0.2.15
     optionalDependencies:
+      '@types/node': 25.2.3
       fsevents: 2.3.3
       tsx: 4.21.0
 
@@ -4517,6 +4625,8 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-tostringtag: 1.0.2
+
+  ws@8.19.0: {}
 
   xtend@4.0.2: {}
 

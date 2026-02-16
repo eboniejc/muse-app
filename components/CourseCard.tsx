@@ -22,7 +22,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
   const isEnrolled = !!enrollment;
 
   const handleEnrollClick = () => {
-    navigate(`/courses/${course.id}/enroll`);
+    navigate(`/complete-registration?courseId=${course.id}`);
   };
 
   return (

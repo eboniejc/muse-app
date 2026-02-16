@@ -1,5 +1,5 @@
 // adapt this to the database schema and helpers if necessary
-import { db } from "../../helpers/db";
+import { supabaseAdmin } from "../../helpers/supabaseServer";
 import { schema } from "./register_with_password_POST.schema";
 import { randomBytes } from "crypto";
 import {
@@ -14,62 +14,59 @@ export async function handle(request: Request) {
     const { email, password, displayName } = schema.parse(json);
 
     // Check if email already exists
-    const existingUser = await db
-      .selectFrom("users")
-      .select("id")
-      .where("email", "=", email)
+    const { data: existingUser, error: existingErr } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', email)
       .limit(1)
-      .execute();
 
-    if (existingUser.length > 0) {
-      return Response.json(
-        { message: "email already in use" },
-        { status: 409 }
-      );
+    if (existingErr) throw existingErr
+    if (existingUser && existingUser.length > 0) {
+      return Response.json({ message: 'email already in use' }, { status: 409 })
     }
 
-    const passwordHash = await generatePasswordHash(password);
+    const passwordHash = await generatePasswordHash(password)
 
-    // Create new user
-    const newUser = await db.transaction().execute(async (trx) => {
-      // Insert the user
-      const [user] = await trx
-        .insertInto("users")
-        .values({
-          email,
-          displayName,
-          role: "user", // Default role
-        })
-        .returning(["id", "email", "displayName", "createdAt"])
-        .execute();
+    // Create new user (using supabase HTTP API)
+    const { data: insertedUsers, error: insertUserErr } = await supabaseAdmin
+      .from('users')
+      .insert({ email, displayname: displayName, role: 'user' })
+      .select('id,email,displayname,createdAt')
 
-      // Store the password hash in another table
-      await trx
-        .insertInto("userPasswords")
-        .values({
-          userId: user.id,
-          passwordHash,
-        })
-        .execute();
+    if (insertUserErr) throw insertUserErr
+    const newUser = Array.isArray(insertedUsers) ? insertedUsers[0] : insertedUsers
 
-      return user;
-    });
+    // Store the password hash in another table
+    const { error: pwErr } = await supabaseAdmin.from('userpasswords').insert({
+      userid: newUser.id,
+      passwordhash: passwordHash,
+    })
+
+    if (pwErr) {
+      // cleanup user if passwords insert failed
+      await supabaseAdmin.from('users').delete().eq('id', newUser.id)
+      throw pwErr
+    }
 
     // Create a new session
     const sessionId = randomBytes(32).toString("hex");
     const now = new Date();
     const expiresAt = new Date(now.getTime() + SessionExpirationSeconds * 1000);
 
-    await db
-      .insertInto("sessions")
-      .values({
-        id: sessionId,
-        userId: newUser.id,
-        createdAt: now,
-        lastAccessed: now,
-        expiresAt,
-      })
-      .execute();
+    const { error: sessionErr } = await supabaseAdmin.from('sessions').insert({
+      id: sessionId,
+      userid: newUser.id,
+      createdat: now.toISOString(),
+      lastaccessed: now.toISOString(),
+      expiresat: expiresAt.toISOString(),
+    })
+
+    if (sessionErr) {
+      // Cleanup created records on failure
+      await supabaseAdmin.from('userpasswords').delete().eq('userid', newUser.id)
+      await supabaseAdmin.from('users').delete().eq('id', newUser.id)
+      throw sessionErr
+    }
 
     // Create response with user data
     const response = Response.json({

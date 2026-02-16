@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet";
 import { useTranslation } from "react-i18next";
 import { useCourses } from "../helpers/useCourses";
 import { CourseCard } from "../components/CourseCard";
+import { CourseWithDetails } from "../endpoints/courses/list_GET.schema";
 import { Input } from "../components/Input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/Select";
 import { Skeleton } from "../components/Skeleton";
@@ -15,7 +16,61 @@ export default function CoursesPage() {
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
 
-  const filteredCourses = courses?.filter(course => {
+  const presetCourses: CourseWithDetails[] = [
+    {
+      id: -101,
+      name: "DJ Foundations",
+      description: "Build core mixing technique, phrasing, EQ control, and set flow.",
+      totalLessons: 12,
+      maxStudents: 20,
+      skillLevel: "beginner",
+      isActive: true,
+      instructorId: null,
+      price: "299",
+      instructorName: "DJ Phatbeatz",
+      instructorAvatar: null,
+      enrolledCount: 0,
+    },
+    {
+      id: -102,
+      name: "Performance & Crowd Control",
+      description: "Design high-energy sets, read the room, and transition confidently live.",
+      totalLessons: 10,
+      maxStudents: 16,
+      skillLevel: "intermediate",
+      isActive: true,
+      instructorId: null,
+      price: "349",
+      instructorName: "DJ Zackie",
+      instructorAvatar: null,
+      enrolledCount: 0,
+    },
+    {
+      id: -103,
+      name: "Advanced Club Systems",
+      description: "Master advanced routing, live edits, effects chains, and pro workflows.",
+      totalLessons: 14,
+      maxStudents: 12,
+      skillLevel: "advanced",
+      isActive: true,
+      instructorId: null,
+      price: "449",
+      instructorName: "DJ Napple",
+      instructorAvatar: null,
+      enrolledCount: 0,
+    },
+  ];
+
+  const mergedCourses = React.useMemo(() => {
+    const deduped = new Map<string, CourseWithDetails>();
+    [...presetCourses, ...(courses ?? [])].forEach((course) => {
+      const key = course.name.toLowerCase().trim();
+      deduped.set(key, course);
+    });
+    return Array.from(deduped.values());
+  }, [courses]);
+
+  const filteredCourses = mergedCourses.filter(course => {
     const matchesSearch = course.name.toLowerCase().includes(search.toLowerCase()) || 
                           course.description?.toLowerCase().includes(search.toLowerCase());
     const matchesLevel = levelFilter === "all" || course.skillLevel?.toLowerCase() === levelFilter;
@@ -25,7 +80,7 @@ export default function CoursesPage() {
   return (
     <div className={styles.container}>
       <Helmet>
-        <title>Courses - DJ School</title>
+        <title>Courses - MUSE INC</title>
       </Helmet>
 
       <div className={styles.header}>
@@ -61,7 +116,7 @@ export default function CoursesPage() {
       </div>
 
       <div className={styles.grid}>
-        {isLoading ? (
+        {isLoading && mergedCourses.length === 0 ? (
           Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className={styles.skeletonCard}>
               <Skeleton className="h-8 w-3/4 mb-4" />
@@ -69,7 +124,7 @@ export default function CoursesPage() {
               <Skeleton className="h-10 w-full" />
             </div>
           ))
-        ) : filteredCourses && filteredCourses.length > 0 ? (
+        ) : filteredCourses.length > 0 ? (
           filteredCourses.map(course => (
             <CourseCard key={course.id} course={course} />
           ))

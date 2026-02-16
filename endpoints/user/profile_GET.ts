@@ -1,4 +1,4 @@
-import { db } from "../../helpers/db";
+import { supabaseAdmin } from "../../helpers/supabaseServer";
 import { getServerUserSession } from "../../helpers/getServerUserSession";
 import superjson from "superjson";
 import { OutputType } from "./profile_GET.schema";
@@ -7,31 +7,30 @@ export async function handle(request: Request) {
   try {
     const { user } = await getServerUserSession(request);
 
-    // Fetch user profile and basic user info
-    const profile = await db
-      .selectFrom("users")
-      .leftJoin("userProfiles", "users.id", "userProfiles.userId")
-      .select([
-        "users.id as userId",
-        "users.email",
-        "users.displayName",
-        "users.avatarUrl",
-        "users.role",
-        "users.whatsappNumber",
-        // Profile fields
-        "userProfiles.fullName",
-        "userProfiles.gender",
-        "userProfiles.address",
-        "userProfiles.phoneNumber",
-        "userProfiles.dateOfBirth",
-        "userProfiles.preferredPaymentMethod",
-        "userProfiles.bankAccountName",
-        "userProfiles.bankAccountNumber",
-        "userProfiles.bankName",
-        "userProfiles.registrationCompleted",
-      ])
-      .where("users.id", "=", user.id)
-      .executeTakeFirst();
+    // Fetch user profile and basic user info from Supabase
+    const { data: profiles, error: err } = await supabaseAdmin
+      .from('users')
+      .select('id,email,displayname,avatarUrl,role,whatsappNumber,userprofiles(fullName,gender,address,phoneNumber,dateOfBirth,preferredPaymentMethod,bankAccountName,bankAccountNumber,bankName,registrationCompleted)')
+      .eq('id', user.id)
+      .limit(1);
+
+    if (err) throw err;
+    const userRec = profiles?.[0];
+    if (!userRec) {
+      return new Response(
+        superjson.stringify({ error: "User not found" }),
+        { status: 404 }
+      );
+    }
+
+    const profile = {
+      userId: userRec.id,
+      email: userRec.email,
+      displayName: userRec.displayname,
+      avatarUrl: userRec.avatarUrl,
+      role: userRec.role,
+      whatsappNumber: userRec.whatsappNumber,
+      ...(userRec.userprofiles?.[0] || {}),
 
     if (!profile) {
       // Should not happen if session is valid, but handle gracefully

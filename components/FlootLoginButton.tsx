@@ -12,7 +12,7 @@ export const FlootLoginButton: React.FC<FlootLoginButtonProps> = ({
 }) => {
   return (
     <OAuthLoginButton
-      provider="floot"
+      provider="oauth"
       className={className}
       disabled={disabled}
     >

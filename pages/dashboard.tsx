@@ -32,7 +32,7 @@ export default function DashboardPage() {
   return (
     <div className={styles.container}>
       <Helmet>
-        <title>Dashboard - DJ School</title>
+        <title>Dashboard - MUSE INC</title>
       </Helmet>
 
       <div className={styles.welcome}>

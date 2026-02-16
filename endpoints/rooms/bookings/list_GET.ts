@@ -4,6 +4,18 @@ import superjson from "superjson";
 import { OutputType, schema } from "./list_GET.schema";
 import { NotAuthenticatedError } from "../../../helpers/getSetServerSession";
 
+function isSchemaOrMissingTableError(error: unknown): boolean {
+  const maybeErr = error as { code?: string; message?: string } | null;
+  if (!maybeErr) return false;
+  return (
+    maybeErr.code === "42703" ||
+    maybeErr.code === "42P01" ||
+    maybeErr.code === "PGRST205" ||
+    maybeErr.message?.includes("does not exist") === true ||
+    maybeErr.message?.includes("schema cache") === true
+  );
+}
+
 export async function handle(request: Request) {
   try {
     await getServerUserSession(request);
@@ -37,9 +49,9 @@ export async function handle(request: Request) {
         "roomBookings.roomId",
         "roomBookings.userId",
         "rooms.name as roomName",
-        "users.displayName as userName",
         "users.email as userEmail",
-      ]);
+      ])
+      .selectAll("users");
 
     if (input.roomId) {
       query = query.where("roomBookings.roomId", "=", input.roomId);
@@ -69,7 +81,11 @@ export async function handle(request: Request) {
           roomId: b.roomId,
           userId: b.userId,
           roomName: b.roomName,
-          userName: b.userName,
+          userName:
+            (b as any).displayName ??
+            (b as any).displayname ??
+            (b as any).display_name ??
+            b.userEmail,
           userEmail: b.userEmail,
         })),
       } satisfies OutputType)
@@ -81,6 +97,11 @@ export async function handle(request: Request) {
       });
     }
     console.error("Error listing bookings:", error);
+    if (isSchemaOrMissingTableError(error)) {
+      return new Response(
+        superjson.stringify({ bookings: [] } satisfies OutputType)
+      );
+    }
     return new Response(
       superjson.stringify({ error: "Failed to fetch bookings" }),
       { status: 500 }

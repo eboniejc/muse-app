@@ -6,34 +6,34 @@ import {
 } from "./OAuthProvider";
 import * as crypto from "crypto";
 
-export class FlootOAuthProvider implements OAuthProviderInterface {
-  public readonly name = "floot";
+export class OAuthProvider implements OAuthProviderInterface {
+  public readonly name = process.env.OAUTH_PROVIDER_NAME || "oauth";
   public readonly clientId: string;
-  public readonly authUrl = "https://floot.com/_api/oauth/authorize";
+  public readonly authUrl = process.env.OAUTH_AUTH_URL || "";
   public readonly scopes = "openid email profile";
   public readonly redirectUri: string;
   private readonly clientSecret: string;
-  private readonly tokenUrl = "https://floot.com/_api/oauth/token";
-  private readonly userInfoUrl = "https://floot.com/_api/oauth/userinfo";
+  private readonly tokenUrl = process.env.OAUTH_TOKEN_URL || "";
+  private readonly userInfoUrl = process.env.OAUTH_USERINFO_URL || "";
 
   constructor(redirectUri: string) {
-    this.clientId = process.env.FLOOT_OAUTH_CLIENT_ID || "";
-    this.clientSecret = process.env.FLOOT_OAUTH_CLIENT_SECRET || "";
+    this.clientId = process.env.OAUTH_CLIENT_ID || "";
+    this.clientSecret = process.env.OAUTH_CLIENT_SECRET || "";
     this.redirectUri = redirectUri;
 
     if (!this.clientId) {
       const error = new Error(
-        "FLOOT_OAUTH_CLIENT_ID environment variable is required"
+        "OAUTH_CLIENT_ID environment variable is required"
       );
-      console.error("FlootOAuthProvider initialization failed:", error);
+      console.error("OAuthProvider initialization failed:", error);
       throw error;
     }
 
     if (!this.clientSecret) {
       const error = new Error(
-        "FLOOT_OAUTH_CLIENT_SECRET environment variable is required"
+        "OAUTH_CLIENT_SECRET environment variable is required"
       );
-      console.error("FlootOAuthProvider initialization failed:", error);
+      console.error("OAuthProvider initialization failed:", error);
       throw error;
     }
   }
@@ -44,7 +44,7 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
     codeVerifier?: string
   ): Promise<OAuthTokens> {
     console.log(
-      "FlootOAuthProvider: Exchanging authorization code for tokens",
+      "OAuthProvider: Exchanging authorization code for tokens",
       {
         codeLength: code.length,
         redirectUri,
@@ -72,7 +72,7 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
         body: JSON.stringify(requestBody),
       });
     } catch (fetchError) {
-      console.error("FlootOAuthProvider: Token exchange fetch error:", {
+      console.error("OAuthProvider: Token exchange fetch error:", {
         error:
           fetchError instanceof Error ? fetchError.message : String(fetchError),
         url: this.tokenUrl,
@@ -93,13 +93,13 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
       } catch (textError) {
         errorText = "Could not read error response body";
         console.error(
-          "FlootOAuthProvider: Failed to read error response text:",
+          "OAuthProvider: Failed to read error response text:",
           textError
         );
       }
 
       console.error(
-        "FlootOAuthProvider: Token exchange failed with error response:",
+        "OAuthProvider: Token exchange failed with error response:",
         {
           status: response.status,
           statusText: response.statusText,
@@ -121,7 +121,7 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
       data = await response.json();
     } catch (jsonError) {
       console.error(
-        "FlootOAuthProvider: Failed to parse token exchange response JSON:",
+        "OAuthProvider: Failed to parse token exchange response JSON:",
         {
           error:
             jsonError instanceof Error ? jsonError.message : String(jsonError),
@@ -140,7 +140,7 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
     if (!data.access_token) {
       throw new OAuthError(
         "TOKEN_EXCHANGE_FAILED",
-        "No access token received from Floot",
+        "No access token received from provider",
         this.name,
         data
       );
@@ -170,7 +170,7 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
         },
       });
     } catch (fetchError) {
-      console.error("FlootOAuthProvider: User info fetch error:", {
+      console.error("OAuthProvider: User info fetch error:", {
         error:
           fetchError instanceof Error ? fetchError.message : String(fetchError),
         url: this.userInfoUrl,
@@ -191,13 +191,13 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
       } catch (textError) {
         errorText = "Could not read error response body";
         console.error(
-          "FlootOAuthProvider: Failed to read user info error response text:",
+          "OAuthProvider: Failed to read user info error response text:",
           textError
         );
       }
 
       console.error(
-        "FlootOAuthProvider: User info fetch failed with error response:",
+        "OAuthProvider: User info fetch failed with error response:",
         {
           status: response.status,
           statusText: response.statusText,
@@ -221,7 +221,7 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
       data = await response.json();
     } catch (jsonError) {
       console.error(
-        "FlootOAuthProvider: Failed to parse user info response JSON:",
+        "OAuthProvider: Failed to parse user info response JSON:",
         {
           error:
             jsonError instanceof Error ? jsonError.message : String(jsonError),
@@ -253,7 +253,7 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
     if (!userInfo.id) {
       throw new OAuthError(
         "PROVIDER_ERROR",
-        "Floot user info missing required id field",
+        "Provider user info missing required id field",
         this.name,
         userInfo
       );
@@ -262,7 +262,7 @@ export class FlootOAuthProvider implements OAuthProviderInterface {
     if (!userInfo.email) {
       throw new OAuthError(
         "PROVIDER_ERROR",
-        "Floot user info missing required email field",
+        "Provider user info missing required email field",
         this.name,
         userInfo
       );

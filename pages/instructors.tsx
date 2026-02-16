@@ -5,16 +5,72 @@ import { MapPin, Phone, Mail } from "lucide-react";
 import { useInstructors } from "../helpers/useInstructors";
 import { InstructorCard } from "../components/InstructorCard";
 import { Skeleton } from "../components/Skeleton";
+import { Instructor } from "../endpoints/instructors/list_GET.schema";
 import styles from "./instructors.module.css";
 
 export default function InstructorsPage() {
   const { t } = useTranslation();
   const { data: instructors, isLoading } = useInstructors();
+  const presetInstructors: Instructor[] = [
+    {
+      id: -1,
+      displayName: "DJ Phatbeatz",
+      email: "",
+      avatarUrl: null,
+      whatsappNumber: "+84902957911",
+      whatsappLink: "https://wa.me/84902957911",
+    },
+    {
+      id: -2,
+      displayName: "DJ Napple",
+      email: "",
+      avatarUrl: null,
+      whatsappNumber: "+84932484884",
+      whatsappLink: "https://wa.me/84932484884",
+    },
+    {
+      id: -3,
+      displayName: "DJ Zackie",
+      email: "",
+      avatarUrl: null,
+      whatsappNumber: "+84909515597",
+      whatsappLink: "https://wa.me/84909515597",
+    },
+    {
+      id: -4,
+      displayName: "DJ Zbuzh",
+      email: "",
+      avatarUrl: null,
+      whatsappNumber: "+84932222292",
+      whatsappLink: "https://wa.me/84932222292",
+    },
+    {
+      id: -5,
+      displayName: "DJ ChieChan",
+      email: "",
+      avatarUrl: null,
+      whatsappNumber: "+84901931801",
+      whatsappLink: "https://wa.me/84901931801",
+    },
+  ];
+
+  const mergedInstructors = React.useMemo(() => {
+    const deduped = new Map<string, Instructor>();
+
+    [...presetInstructors, ...(instructors ?? [])].forEach((inst) => {
+      const phoneKey = (inst.whatsappNumber || "").replace(/\D/g, "");
+      const nameKey = inst.displayName.toLowerCase().trim();
+      const key = phoneKey || nameKey;
+      deduped.set(key, inst);
+    });
+
+    return Array.from(deduped.values());
+  }, [instructors]);
 
   return (
     <div className={styles.container}>
       <Helmet>
-        <title>Instructors - DJ School</title>
+        <title>Instructors - MUSE INC</title>
       </Helmet>
 
       <div className={styles.header}>
@@ -25,7 +81,7 @@ export default function InstructorsPage() {
       </div>
 
       <div className={styles.grid}>
-        {isLoading ? (
+        {isLoading && mergedInstructors.length === 0 ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className={styles.skeletonCard}>
               <div className={styles.skeletonHeader}>
@@ -38,8 +94,8 @@ export default function InstructorsPage() {
               <Skeleton className={styles.skeletonButton} />
             </div>
           ))
-        ) : instructors && instructors.length > 0 ? (
-          instructors.map((instructor) => (
+        ) : mergedInstructors.length > 0 ? (
+          mergedInstructors.map((instructor) => (
             <InstructorCard key={instructor.id} instructor={instructor} />
           ))
         ) : (

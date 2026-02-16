@@ -10,7 +10,10 @@ export const schema = z.object({
     "rooms",
     "roomBookings",
     "courseEnrollments",
+    "lessonCompletions",
     "lessonSchedules",
+    "users",
+    "userProfiles",
   ]),
   rows: z.array(z.record(z.any())),
 });

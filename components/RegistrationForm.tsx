@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
@@ -11,7 +11,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
 import { Calendar } from "./Calendar";
 import { Checkbox } from "./Checkbox";
 import { useUpdateUserProfile, useUserProfile } from "../helpers/useUserProfile";
+import { useEnrollCourse } from "../helpers/useEnrollCourse";
+import { useCourses } from "../helpers/useCourses";
 import { schema as profileSchema } from "../endpoints/user/profile_POST.schema";
+import { toast } from "sonner";
 import styles from "./RegistrationForm.module.css";
 
 // Extend the schema to handle the UI specific logic if needed, 
@@ -27,8 +30,13 @@ type FormValues = z.infer<typeof formSchema>;
 
 export const RegistrationForm = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedCourseId = Number(searchParams.get("courseId"));
+  const hasSelectedCourse = Number.isFinite(selectedCourseId) && selectedCourseId > 0;
   const { data: profile, isLoading } = useUserProfile();
-  const { mutate: updateProfile, isPending } = useUpdateUserProfile();
+  const { data: courses } = useCourses();
+  const { mutateAsync: updateProfile, isPending } = useUpdateUserProfile();
+  const enrollCourseMutation = useEnrollCourse();
 
   const form = useForm({
     schema: formSchema,
@@ -62,12 +70,35 @@ export const RegistrationForm = () => {
     }
   }, [profile, form.setValues]);
 
-  const onSubmit = (values: FormValues) => {
-    updateProfile(values, {
-      onSuccess: () => {
-        navigate("/dashboard");
-      },
-    });
+  const onSubmit = async (values: FormValues) => {
+    try {
+      await updateProfile(values);
+
+      if (hasSelectedCourse) {
+        await enrollCourseMutation.mutateAsync({ courseId: selectedCourseId });
+
+        const selectedCourse = courses?.find((c) => c.id === selectedCourseId);
+        const studentName =
+          values.fullName ||
+          profile?.fullName ||
+          profile?.displayName ||
+          "A student";
+        const courseName = selectedCourse?.name || `Course #${selectedCourseId}`;
+        const whatsappMessage = encodeURIComponent(
+          `New enrollment: ${studentName} enrolled in ${courseName}.`
+        );
+        const whatsappUrl = `https://wa.me/16302904094?text=${whatsappMessage}`;
+        (window.top || window).open(whatsappUrl, "_blank");
+      }
+
+      navigate("/dashboard");
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to complete registration");
+      }
+    }
   };
 
   const paymentMethod = form.values.preferredPaymentMethod;
@@ -241,8 +272,15 @@ export const RegistrationForm = () => {
         </div>
 
         <div className={styles.actions}>
-          <Button type="submit" size="lg" disabled={isPending} className={styles.submitButton}>
-            {isPending ? "Saving..." : "Hoàn Tất Đăng Ký (Complete Registration)"}
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isPending || enrollCourseMutation.isPending}
+            className={styles.submitButton}
+          >
+            {isPending || enrollCourseMutation.isPending
+              ? "Saving..."
+              : "Hoàn Tất Đăng Ký (Complete Registration)"}
           </Button>
         </div>
       </form>

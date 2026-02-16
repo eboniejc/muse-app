@@ -2,7 +2,7 @@ import { schema } from "./script_GET.schema";
 
 // This content is copied from static/google-apps-script.txt as requested
 const GOOGLE_APPS_SCRIPT_CONTENT = `/**
- * DJ School Management System - Google Sheets Sync Script
+ * MUSE INC Management System - Google Sheets Sync Script
  * 
  * Instructions:
  * 1. Open your Google Sheet
@@ -10,8 +10,8 @@ const GOOGLE_APPS_SCRIPT_CONTENT = `/**
  * 3. Delete any existing code and paste this entire script
  * 4. Save the project (File > Save)
  * 5. Reload your Google Sheet
- * 6. You will see a "DJ School Sync" menu appear
- * 7. Click "DJ School Sync" > "Setup" to configure your API Key and App URL
+ * 6. You will see a "MUSE INC Sync" menu appear
+ * 7. Click "MUSE INC Sync" > "Setup" to configure your API Key and App URL
  */
 
 // --- CONFIGURATION ---
@@ -23,7 +23,7 @@ function setup() {
   // Prompt for App URL
   const urlResponse = ui.prompt(
     'Setup',
-    'Enter your App URL (e.g., https://myapp.floot.app):',
+    'Enter your App URL (e.g., https://myapp.example.com):',
     ui.ButtonSet.OK_CANCEL
   );
 
@@ -51,7 +51,7 @@ function setup() {
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('DJ School Sync')
+  ui.createMenu('MUSE INC Sync')
     .addItem('⚙️ Setup Configuration', 'setup')
     .addSeparator()
     .addItem('📥 Pull from App', 'pullFromApp')
@@ -178,12 +178,15 @@ function pushToApp() {
 
   // Define which tables are writable
   const writableTables = [
-    "courses", 
-    "ebooks", 
-    "rooms", 
-    "roomBookings", 
-    "courseEnrollments", 
-    "lessonSchedules"
+    "courses",
+    "ebooks",
+    "rooms",
+    "roomBookings",
+    "courseEnrollments",
+    "lessonCompletions",
+    "lessonSchedules",
+    "users",
+    "userProfiles"
   ];
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();

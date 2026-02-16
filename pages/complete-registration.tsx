@@ -10,13 +10,13 @@ export default function CompleteRegistrationPage() {
   return (
     <div className={styles.pageWrapper}>
       <Helmet>
-        <title>Complete Registration - DJ School</title>
+        <title>Complete Registration - MUSE INC</title>
       </Helmet>
 
       <header className={styles.header}>
         <div className={styles.logoContainer}>
           <Music2 className={styles.logoIcon} />
-          <span className={styles.logoText}>DJ SCHOOL</span>
+          <span className={styles.logoText}>MUSE INC</span>
         </div>
       </header>
 

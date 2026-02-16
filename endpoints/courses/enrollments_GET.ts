@@ -4,6 +4,18 @@ import superjson from "superjson";
 import { OutputType } from "./enrollments_GET.schema";
 import { NotAuthenticatedError } from "../../helpers/getSetServerSession";
 
+function isSchemaOrMissingTableError(error: unknown): boolean {
+  const maybeErr = error as { code?: string; message?: string } | null;
+  if (!maybeErr) return false;
+  return (
+    maybeErr.code === "42703" ||
+    maybeErr.code === "42P01" ||
+    maybeErr.code === "PGRST205" ||
+    maybeErr.message?.includes("does not exist") === true ||
+    maybeErr.message?.includes("schema cache") === true
+  );
+}
+
 export async function handle(request: Request) {
   try {
     const { user } = await getServerUserSession(request);
@@ -74,6 +86,11 @@ export async function handle(request: Request) {
       });
     }
     console.error("Error fetching enrollments:", error);
+    if (isSchemaOrMissingTableError(error)) {
+      return new Response(
+        superjson.stringify({ enrollments: [] } satisfies OutputType)
+      );
+    }
     return new Response(
       superjson.stringify({ error: "Failed to fetch enrollments" }),
       { status: 500 }

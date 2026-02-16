@@ -1,13 +1,11 @@
 import { OAuthProviderInterface, OAuthProviderType } from "./OAuthProvider";
-import { FlootOAuthProvider } from "./FlootOAuthProvider";
+import { OAuthProvider } from "./FlootOAuthProvider";
 
 export function getOAuthProvider(
   providerName: OAuthProviderType,
   redirectUri: string
 ): OAuthProviderInterface {
-  switch (providerName) {
-    case "floot":
-      return new FlootOAuthProvider(redirectUri);
-    // add more providers here
-  }
+  // For now we have a single generic provider implementation.
+  // When multiple providers are added, dispatch on providerName here.
+  return new OAuthProvider(redirectUri);
 }

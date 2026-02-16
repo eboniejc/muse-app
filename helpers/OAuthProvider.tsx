@@ -1,12 +1,7 @@
 import { User } from "./User";
 
-// Single source of truth for supported OAuth provider names. Make sure to update this as more are added
-export const oauthProviders = ["floot"] as const;
-
-// Note: the floot provider offers log in with Google via floot. However it only supports auth. If more scope
-// is required, a specific GoogleProvider with a google resource will be required.
-
-export type OAuthProviderType = (typeof oauthProviders)[number];
+// OAuth provider type is a free-form string to allow pluggable providers configured via env
+export type OAuthProviderType = string;
 
 export interface OAuthTokens {
   accessToken: string;

@@ -16,7 +16,7 @@ export const LandingFooter = () => {
             <span className={styles.name}>MUSE INC</span>
           </div>
           <p className={styles.description}>
-            The premier DJ school and professional audio equipment supplier in Vietnam.
+            The premier MUSE INC and professional audio equipment supplier in Vietnam.
           </p>
           <div className={styles.socials}>
             <a href="#" className={styles.socialLink} aria-label="Facebook"><Facebook size={20} /></a>

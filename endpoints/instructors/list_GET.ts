@@ -8,14 +8,37 @@ export async function handle(request: Request) {
 
     const instructors = await db
       .selectFrom("users")
-      .select(["id", "displayName", "email", "avatarUrl", "whatsappNumber"])
+      .selectAll()
       .where("role", "=", "instructor")
       .execute();
 
     const formattedInstructors = instructors.map((inst) => ({
-      ...inst,
-      whatsappLink: inst.whatsappNumber
-        ? `https://wa.me/${inst.whatsappNumber.replace(/[^0-9]/g, "")}`
+      id: inst.id,
+      displayName:
+        (inst as any).displayName ??
+        (inst as any).displayname ??
+        (inst as any).display_name ??
+        "",
+      email: inst.email,
+      avatarUrl:
+        (inst as any).avatarUrl ??
+        (inst as any).avatarurl ??
+        (inst as any).avatar_url ??
+        null,
+      whatsappNumber:
+        (inst as any).whatsappNumber ??
+        (inst as any).whatsappnumber ??
+        (inst as any).whatsapp_number ??
+        null,
+      whatsappLink:
+        ((inst as any).whatsappNumber ??
+          (inst as any).whatsappnumber ??
+          (inst as any).whatsapp_number)
+          ? `https://wa.me/${String(
+              (inst as any).whatsappNumber ??
+                (inst as any).whatsappnumber ??
+                (inst as any).whatsapp_number
+            ).replace(/[^0-9]/g, "")}`
         : null,
     }));
 

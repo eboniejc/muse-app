@@ -45,7 +45,7 @@ export default function SchedulePage() {
   return (
     <div className={styles.container}>
       <Helmet>
-        <title>Schedule Studio - DJ School</title>
+        <title>Schedule Studio - MUSE INC</title>
       </Helmet>
 
       <div className={styles.header}>
