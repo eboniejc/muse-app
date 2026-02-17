@@ -30,3 +30,20 @@ pnpm install
 pnpm vite build
 pnpm tsx server.ts
 ```
+
+## Deploy Free (Render)
+
+This app can be hosted for free on a Render **Web Service**.
+
+1. Push this repo to GitHub.
+2. In Render, create `New > Web Service` and connect the repo.
+3. Configure:
+   - Build Command: `pnpm install && pnpm run build`
+   - Start Command: `pnpm run start`
+   - Instance Type: `Free`
+4. Add environment variables in Render (same keys used in `env.example.json`).
+5. Deploy.
+
+Notes:
+- `loadEnv.js` now treats `env.json` as optional, so production can use host-managed env vars directly.
+- Free Render web services sleep after idle time and may take a short time to wake up on the first request.
