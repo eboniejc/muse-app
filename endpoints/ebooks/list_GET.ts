@@ -104,10 +104,33 @@ export async function handle(request: Request) {
       lessonCompletions.map((lc) => `${lc.enrollmentId}-${lc.lessonNumber}`)
     );
 
+    // Unlock fallback: if a lesson was scheduled and 1 hour has passed since start time.
+    let lessonSchedules: {
+      enrollmentId: number;
+      lessonNumber: number;
+      scheduledAt: Date;
+    }[] = [];
+    if (enrollmentIds.length > 0) {
+      lessonSchedules = await db
+        .selectFrom("lessonSchedules")
+        .select(["enrollmentId", "lessonNumber", "scheduledAt"])
+        .where("enrollmentId", "in", enrollmentIds)
+        .execute();
+    }
+
+    const oneHourMs = 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const unlockedByScheduleSet = new Set(
+      lessonSchedules
+        .filter((ls) => new Date(ls.scheduledAt).getTime() + oneHourMs <= nowMs)
+        .map((ls) => `${ls.enrollmentId}-${ls.lessonNumber}`)
+    );
+
     const resultEbooks = ebooks.map((ebook) => {
       let isUnlocked = false;
 
       // Unlock only when the corresponding lesson is marked complete.
+      // Also unlock 1 hour after scheduled lesson time from lessonSchedules.
       // Supports both 0-based and 1-based sort ordering from sheet data.
       const enrollmentId = ebook.courseId
         ? enrollmentByCourseId.get(ebook.courseId)
@@ -116,7 +139,10 @@ export async function handle(request: Request) {
         const keySame = `${enrollmentId}-${ebook.sortOrder}`;
         const keyPlusOne = `${enrollmentId}-${ebook.sortOrder + 1}`;
         isUnlocked =
-          completedLessonsSet.has(keySame) || completedLessonsSet.has(keyPlusOne);
+          completedLessonsSet.has(keySame) ||
+          completedLessonsSet.has(keyPlusOne) ||
+          unlockedByScheduleSet.has(keySame) ||
+          unlockedByScheduleSet.has(keyPlusOne);
       }
 
       return {
