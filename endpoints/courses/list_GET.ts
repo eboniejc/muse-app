@@ -136,11 +136,30 @@ function isMissingTableError(error: unknown, tableName: string): boolean {
 
 export async function handle(request: Request) {
   try {
-    // Public endpoint - fetch active courses with instructor info
-    const { data: courses, error: coursesErr } = await supabaseAdmin
+    // Public endpoint - fetch active courses with instructor info.
+    // Retry with alternate user avatar column names for schema compatibility.
+    let { data: courses, error: coursesErr } = await supabaseAdmin
       .from('courses')
       .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,users(displayname,avatarUrl)')
       .eq('isActive', true);
+
+    if (coursesErr?.code === "42703") {
+      const retry = await supabaseAdmin
+        .from('courses')
+        .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,users(displayname,avatarurl)')
+        .eq('isActive', true);
+      courses = retry.data;
+      coursesErr = retry.error;
+    }
+
+    if (coursesErr?.code === "42703") {
+      const retry = await supabaseAdmin
+        .from('courses')
+        .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,users(displayname)')
+        .eq('isActive', true);
+      courses = retry.data;
+      coursesErr = retry.error;
+    }
 
     if (coursesErr) {
       if (isMissingTableError(coursesErr, "courses")) {
@@ -187,7 +206,7 @@ export async function handle(request: Request) {
       isActive: course.isActive,
       instructorId: course.instructorId,
       instructorName: course.users?.displayname || null,
-      instructorAvatar: course.users?.avatarUrl || null,
+      instructorAvatar: course.users?.avatarUrl || course.users?.avatarurl || null,
       enrolledCount: countMap.get(course.id) || 0,
     }));
 
