@@ -141,14 +141,10 @@ export async function handle(request: Request) {
     );
   } catch (error) {
     console.error("Error listing ebooks:", error);
-    if (isSchemaOrMissingTableError(error)) {
-      return new Response(
-        superjson.stringify({ ebooks: fallbackEbooks } satisfies OutputType)
-      );
-    }
+    // Always return locked fallback ebooks so the page still renders even when
+    // database/schema configuration is incomplete in production.
     return new Response(
-      superjson.stringify({ error: "Failed to fetch ebooks" }),
-      { status: 500 }
+      superjson.stringify({ ebooks: fallbackEbooks } satisfies OutputType)
     );
   }
 }
