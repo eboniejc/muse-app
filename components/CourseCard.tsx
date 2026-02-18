@@ -18,7 +18,9 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
   const navigate = useNavigate();
   const { data: enrollments } = useCourseEnrollments();
 
-  const enrollment = enrollments?.find((e) => e.courseId === course.id);
+  const enrollment = enrollments?.find(
+    (e) => String(e.courseId) === String(course.id)
+  );
   const isEnrolled = !!enrollment;
 
   const handleEnrollClick = () => {
