@@ -9,17 +9,17 @@ async function upsertLowercaseProfileTable(userId: number, input: any) {
     .upsert(
       {
         userid: userId,
-        fullName: input.fullName,
+        fullname: input.fullName,
         gender: input.gender ?? null,
         address: input.address ?? null,
-        phoneNumber: input.phoneNumber,
-        dateOfBirth: input.dateOfBirth ?? null,
-        preferredPaymentMethod: input.preferredPaymentMethod ?? null,
-        bankAccountName: input.bankAccountName ?? null,
-        bankAccountNumber: input.bankAccountNumber ?? null,
-        bankName: input.bankName ?? null,
-        registrationCompleted: true,
-        updatedAt: new Date().toISOString(),
+        phonenumber: input.phoneNumber,
+        dateofbirth: input.dateOfBirth ?? null,
+        preferredpaymentmethod: input.preferredPaymentMethod ?? null,
+        bankaccountname: input.bankAccountName ?? null,
+        bankaccountnumber: input.bankAccountNumber ?? null,
+        bankname: input.bankName ?? null,
+        registrationcompleted: true,
+        updatedat: new Date().toISOString(),
       },
       { onConflict: "userid" }
     )
