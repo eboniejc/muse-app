@@ -2,5 +2,6 @@ node_modules
 env.json
 .env
 server.log
+yarn-error.log
 tmp_debug.ts
 tmp_import_test.mjs

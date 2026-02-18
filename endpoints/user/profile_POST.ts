@@ -3,32 +3,71 @@ import { supabaseAdmin } from "../../helpers/supabaseServer";
 import superjson from "superjson";
 import { schema, OutputType } from "./profile_POST.schema";
 
+async function upsertLowercaseProfileTable(userId: number, input: any) {
+  return supabaseAdmin
+    .from("userprofiles")
+    .upsert(
+      {
+        userid: userId,
+        fullName: input.fullName,
+        gender: input.gender ?? null,
+        address: input.address ?? null,
+        phoneNumber: input.phoneNumber,
+        dateOfBirth: input.dateOfBirth ?? null,
+        preferredPaymentMethod: input.preferredPaymentMethod ?? null,
+        bankAccountName: input.bankAccountName ?? null,
+        bankAccountNumber: input.bankAccountNumber ?? null,
+        bankName: input.bankName ?? null,
+        registrationCompleted: true,
+        updatedAt: new Date().toISOString(),
+      },
+      { onConflict: "userid" }
+    )
+    .select("id")
+    .maybeSingle();
+}
+
+async function upsertCamelProfileTable(userId: number, input: any) {
+  return supabaseAdmin
+    .from("userProfiles")
+    .upsert(
+      {
+        userId: userId,
+        fullName: input.fullName,
+        gender: input.gender ?? null,
+        address: input.address ?? null,
+        phoneNumber: input.phoneNumber,
+        dateOfBirth: input.dateOfBirth ?? null,
+        preferredPaymentMethod: input.preferredPaymentMethod ?? null,
+        bankAccountName: input.bankAccountName ?? null,
+        bankAccountNumber: input.bankAccountNumber ?? null,
+        bankName: input.bankName ?? null,
+        registrationCompleted: true,
+        updatedAt: new Date().toISOString(),
+      },
+      { onConflict: "userId" }
+    )
+    .select("id")
+    .maybeSingle();
+}
+
 export async function handle(request: Request) {
   try {
     const { user } = await getServerUserSession(request);
     const json = superjson.parse(await request.text());
     const input = schema.parse(json);
 
-    const payload = {
-      userid: user.id,
-      fullName: input.fullName,
-      gender: input.gender ?? null,
-      address: input.address ?? null,
-      phoneNumber: input.phoneNumber,
-      dateOfBirth: input.dateOfBirth ?? null,
-      preferredPaymentMethod: input.preferredPaymentMethod ?? null,
-      bankAccountName: input.bankAccountName ?? null,
-      bankAccountNumber: input.bankAccountNumber ?? null,
-      bankName: input.bankName ?? null,
-      registrationCompleted: true,
-      updatedAt: new Date().toISOString(),
-    };
+    let { data: profileRow, error: profileErr } = await upsertLowercaseProfileTable(
+      user.id,
+      input
+    );
 
-    const { data: profileRow, error: profileErr } = await supabaseAdmin
-      .from("userprofiles")
-      .upsert(payload, { onConflict: "userid" })
-      .select("id")
-      .maybeSingle();
+    if (profileErr?.code === "PGRST205") {
+      ({ data: profileRow, error: profileErr } = await upsertCamelProfileTable(
+        user.id,
+        input
+      ));
+    }
 
     if (profileErr) {
       throw profileErr;
