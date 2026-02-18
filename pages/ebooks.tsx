@@ -14,51 +14,7 @@ export default function EbooksPage() {
   const { t } = useTranslation();
   const { data: ebooks, isLoading } = useEbooks();
   const [filter, setFilter] = useState<FilterType>("all");
-
-  const orderedEbookLinks = [
-    "https://drive.google.com/file/d/161qr5Le9QUn_TaB3RGWeWEGLOhBM-u_r/view?usp=drive_link",
-    "https://drive.google.com/file/d/1UWl48BPet3P6GdN9MyxBMHfr9yCDN8K5/view?usp=drive_link",
-    "https://drive.google.com/file/d/1HbHh39duXPRaHdg0DcmEcCPvMHDNaHcL/view?usp=drive_link",
-    "https://drive.google.com/file/d/1q8z50bCissHMCegmVg-QXnrLCFjCZs53/view?usp=drive_link",
-    "https://drive.google.com/file/d/1IirRh5Rs8SlOO4NIB0yi02gv3M09BZaD/view?usp=drive_link",
-    "https://drive.google.com/file/d/1iWQPll_P1VT3Rtos-MTkwcPP1GHBKaMG/view?usp=drive_link",
-    "https://drive.google.com/file/d/1hxHELh9eBGgFVC_Ksyx2sHKmP78__vWF/view?usp=drive_link",
-    "https://drive.google.com/file/d/1FfYtCPA5sX25fp51c-M5zswXmtdRTzvJ/view?usp=drive_link",
-    "https://drive.google.com/file/d/1LTX6jfHmX6lnO6LTps6ocAAd2f8IiKyz/view?usp=drive_link",
-    "https://drive.google.com/file/d/1VMlIhFOJ2MK7Pt6esdEJpvf22fWuMMma/view?usp=drive_link",
-    "https://drive.google.com/file/d/1AyINHC7I3aqR8o2NooIaEuUfXTdSfi2c/view?usp=drive_link",
-    "https://drive.google.com/file/d/1szF0laTSgjENv1WGXRQw6bC2W_UoUSfi/view?usp=drive_link",
-    "https://drive.google.com/file/d/1gkdCxt6O9EDNrsbrjm_GY5xczm5cIsYQ/view?usp=drive_link",
-    "https://drive.google.com/file/d/15VyzWtEOALjx5mfu-Yv50so6g6Z8fUN7/view?usp=drive_link",
-    "https://drive.google.com/file/d/1339VfTCqY62bRuOZMqQ9PwZJOtk20FBR/view?usp=drive_link",
-    "https://drive.google.com/file/d/1tJHhA3fJSnNkxEX24yAgcwDMMowAD1XN/view?usp=drive_link",
-    "https://docs.google.com/document/d/1O-Iu4z3rvc94w5F6fkDwERw6Z79G5V9d/edit?usp=drive_link&ouid=109745014509333769352&rtpof=true&sd=true",
-  ];
-
-  const presetEbooks: EbookWithStatus[] = orderedEbookLinks.map(
-    (fileUrl, index) => ({
-      id: -(index + 1),
-      title: `E-book ${index + 1}`,
-      titleVi: `E-book ${index + 1}`,
-      description: `DJ learning material #${index + 1}`,
-      descriptionVi: `Tài liệu học DJ #${index + 1}`,
-      coverImageUrl: null,
-      fileUrl,
-      courseId: null,
-      sortOrder: index,
-      courseName: null,
-      isUnlocked: true,
-    })
-  );
-
-  const mergedEbooks = React.useMemo(() => {
-    const deduped = new Map<string, EbookWithStatus>();
-    [...presetEbooks, ...(ebooks ?? [])].forEach((ebook) => {
-      const key = ebook.title.toLowerCase().trim();
-      deduped.set(key, ebook);
-    });
-    return Array.from(deduped.values());
-  }, [ebooks]);
+  const mergedEbooks = ebooks ?? [];
 
   const filteredEbooks = mergedEbooks.filter((ebook) => {
     if (filter === "all") return true;

@@ -35,7 +35,7 @@ const fallbackEbooks: OutputType["ebooks"] = orderedEbookLinks.map(
     courseId: null,
     sortOrder: index,
     courseName: null,
-    isUnlocked: true,
+    isUnlocked: false,
   })
 );
 
@@ -104,34 +104,19 @@ export async function handle(request: Request) {
       lessonCompletions.map((lc) => `${lc.enrollmentId}-${lc.lessonNumber}`)
     );
 
-    // Get lesson schedules for these enrollments where scheduledAt is in the past
-    let lessonSchedules: { enrollmentId: number; lessonNumber: number }[] = [];
-    if (enrollmentIds.length > 0) {
-      lessonSchedules = await db
-        .selectFrom("lessonSchedules")
-        .select(["enrollmentId", "lessonNumber"])
-        .where("enrollmentId", "in", enrollmentIds)
-        .where("scheduledAt", "<", new Date())
-        .execute();
-    }
-
-    // Build a set of scheduled past lessons: "enrollmentId-lessonNumber"
-    const scheduledPastLessonsSet = new Set(
-      lessonSchedules.map((ls) => `${ls.enrollmentId}-${ls.lessonNumber}`)
-    );
-
     const resultEbooks = ebooks.map((ebook) => {
       let isUnlocked = false;
 
-      // Unlock logic: courseId is null OR sortOrder is 0 OR there exists a lesson completion for this ebook
-      if (ebook.courseId === null || ebook.sortOrder === 0) {
-        isUnlocked = true;
-      } else {
-        const enrollmentId = enrollmentByCourseId.get(ebook.courseId);
-        if (enrollmentId) {
-          const key = `${enrollmentId}-${ebook.sortOrder}`;
-          isUnlocked = completedLessonsSet.has(key) || scheduledPastLessonsSet.has(key);
-        }
+      // Unlock only when the corresponding lesson is marked complete.
+      // Supports both 0-based and 1-based sort ordering from sheet data.
+      const enrollmentId = ebook.courseId
+        ? enrollmentByCourseId.get(ebook.courseId)
+        : undefined;
+      if (enrollmentId) {
+        const keySame = `${enrollmentId}-${ebook.sortOrder}`;
+        const keyPlusOne = `${enrollmentId}-${ebook.sortOrder + 1}`;
+        isUnlocked =
+          completedLessonsSet.has(keySame) || completedLessonsSet.has(keyPlusOne);
       }
 
       return {
