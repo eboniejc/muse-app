@@ -2,6 +2,7 @@ import { db } from "../../helpers/db";
 import { validateSheetsApiKey } from "../../helpers/validateSheetsApiKey";
 import { OutputType } from "./export_POST.schema";
 import superjson from "superjson";
+import { supabaseAdmin } from "../../helpers/supabaseServer";
 
 async function safeSelectAll(table: string) {
   try {
@@ -10,6 +11,19 @@ async function safeSelectAll(table: string) {
     console.error(`Sheets export: failed to query table ${table}:`, error);
     return [];
   }
+}
+
+async function safeSelectCourseEnrollments() {
+  const rows = await safeSelectAll("courseEnrollments");
+  if (rows.length > 0) return rows;
+  const { data, error } = await supabaseAdmin
+    .from("courseEnrollments")
+    .select("*");
+  if (error) {
+    console.error("Sheets export: failed Supabase query for courseEnrollments:", error);
+    return [];
+  }
+  return data ?? [];
 }
 
 export async function handle(request: Request) {
@@ -35,7 +49,7 @@ export async function handle(request: Request) {
       safeSelectAll("ebooks"),
       safeSelectAll("rooms"),
       safeSelectAll("roomBookings"),
-      safeSelectAll("courseEnrollments"),
+      safeSelectCourseEnrollments(),
       safeSelectAll("lessonCompletions"),
       safeSelectAll("lessonSchedules"),
       safeSelectAll("users"),
