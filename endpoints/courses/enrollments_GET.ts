@@ -22,11 +22,35 @@ export async function handle(request: Request) {
     const { user } = await getServerUserSession(request);
 
     const buildFromSupabaseRest = async () => {
-      const { data: enrollments, error: enrollmentErr } = await supabaseAdmin
+      let { data: enrollments, error: enrollmentErr } = await supabaseAdmin
         .from("courseEnrollments")
         .select("id,status,progressPercentage,enrolledAt,completedAt,courseId")
         .eq("userId", user.id as any)
         .order("enrolledAt", { ascending: false });
+
+      if (enrollmentErr || !enrollments || enrollments.length === 0) {
+        const snake = await supabaseAdmin
+          .from("course_enrollments")
+          .select(
+            "id,status,progress_percentage,enrolled_at,completed_at,course_id,user_id"
+          )
+          .eq("user_id", user.id as any)
+          .order("enrolled_at", { ascending: false });
+        if (!snake.error && snake.data) {
+          enrollments = snake.data.map((e: any) => ({
+            id: e.id,
+            status: e.status,
+            progressPercentage: e.progress_percentage,
+            enrolledAt: e.enrolled_at,
+            completedAt: e.completed_at,
+            courseId: e.course_id,
+            userId: e.user_id,
+          }));
+          enrollmentErr = null;
+        } else if (enrollmentErr) {
+          throw enrollmentErr;
+        }
+      }
       if (enrollmentErr) throw enrollmentErr;
 
       const rows = enrollments ?? [];
