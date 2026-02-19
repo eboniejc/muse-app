@@ -141,7 +141,52 @@ export async function handle(request: Request) {
           }
         }
 
-        return [...existing, ...templateRows];
+        const mergedRows = [...existing, ...templateRows];
+        const enrollmentMap = new Map(
+          (courseEnrollments ?? []).map((enrollment: any) => [
+            String(readField(enrollment, "id")),
+            enrollment,
+          ])
+        );
+
+        return mergedRows.map((row: any) => {
+          const enrollmentId = readField<string | number>(
+            row,
+            "enrollmentId",
+            "enrollment_id"
+          );
+          const enrollment = enrollmentMap.get(String(enrollmentId));
+          const userId = readField<string | number>(
+            enrollment ?? {},
+            "userId",
+            "user_id"
+          );
+          const courseId = readField<string | number>(
+            enrollment ?? {},
+            "courseId",
+            "course_id"
+          );
+          const user = (users ?? []).find(
+            (u: any) => String(readField(u, "id")) === String(userId)
+          );
+          const course = (courses ?? []).find(
+            (c: any) => String(readField(c, "id")) === String(courseId)
+          );
+
+          return {
+            ...row,
+            userId,
+            courseId,
+            studentName:
+              row.studentName ??
+              user?.displayName ??
+              user?.displayname ??
+              user?.email ??
+              "",
+            studentEmail: row.studentEmail ?? user?.email ?? "",
+            courseName: row.courseName ?? course?.name ?? "",
+          };
+        });
       })(),
       users,
       userProfiles,
