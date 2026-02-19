@@ -120,6 +120,30 @@ function normalizeLessonScheduleRow(row: Record<string, any>) {
   };
 }
 
+function isSchemaError(error: any): boolean {
+  const message = String(error?.message ?? "");
+  return (
+    error?.code === "PGRST205" ||
+    error?.code === "PGRST204" ||
+    error?.code === "42P01" ||
+    message.includes("relation") ||
+    message.includes("schema cache")
+  );
+}
+
+function formatUnknownError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const e: any = error;
+    const message = e.message ?? "Unknown error";
+    const code = e.code ? ` [${e.code}]` : "";
+    const details = e.details ? ` details=${e.details}` : "";
+    const hint = e.hint ? ` hint=${e.hint}` : "";
+    return `${message}${code}${details}${hint}`;
+  }
+  return String(error ?? "Unknown error");
+}
+
 export async function handle(request: Request) {
   try {
     const validation = validateSheetsApiKey(request);
@@ -176,7 +200,7 @@ export async function handle(request: Request) {
       superjson.stringify({
         success: false,
         count: 0,
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: formatUnknownError(error),
       } satisfies OutputType),
       { status: 500 }
     );
@@ -194,62 +218,121 @@ async function handleLessonSchedulesImport(rows: any[]) {
 
     const scheduledDate = new Date(row.scheduledAt);
     let existingSchedule: any = null;
+    let scheduleTable = "lessonSchedules";
+
+    const fetchExistingById = async (table: string) => {
+      const idCol = table === "lessonSchedules" ? "id" : "id";
+      return supabaseAdmin.from(table).select("*").eq(idCol, row.id).limit(1).maybeSingle();
+    };
+    const fetchExistingByKey = async (table: string) => {
+      if (table === "lessonSchedules") {
+        return supabaseAdmin
+          .from(table)
+          .select("*")
+          .eq("enrollmentId", row.enrollmentId)
+          .eq("lessonNumber", row.lessonNumber)
+          .limit(1)
+          .maybeSingle();
+      }
+      return supabaseAdmin
+        .from(table)
+        .select("*")
+        .eq("enrollment_id", row.enrollmentId)
+        .eq("lesson_number", row.lessonNumber)
+        .limit(1)
+        .maybeSingle();
+    };
 
     if (row.id) {
-      const { data, error } = await supabaseAdmin
-        .from("lessonSchedules")
-        .select("*")
-        .eq("id", row.id)
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
+      let { data, error } = await fetchExistingById("lessonSchedules");
+      if (error && isSchemaError(error)) {
+        scheduleTable = "lesson_schedules";
+        ({ data, error } = await fetchExistingById("lesson_schedules"));
+      }
+      if (error && error.code !== "PGRST116") throw error;
       existingSchedule = data;
     } else {
-      const { data, error } = await supabaseAdmin
-        .from("lessonSchedules")
-        .select("*")
-        .eq("enrollmentId", row.enrollmentId)
-        .eq("lessonNumber", row.lessonNumber)
-        .limit(1)
-        .maybeSingle();
+      let { data, error } = await fetchExistingByKey("lessonSchedules");
+      if (error && isSchemaError(error)) {
+        scheduleTable = "lesson_schedules";
+        ({ data, error } = await fetchExistingByKey("lesson_schedules"));
+      }
       if (error && error.code !== "PGRST116") throw error;
       existingSchedule = data;
     }
 
     const timeChanged = existingSchedule
-      ? new Date(existingSchedule.scheduledAt).getTime() !== scheduledDate.getTime()
+      ? new Date(existingSchedule.scheduledAt ?? existingSchedule.scheduled_at).getTime() !== scheduledDate.getTime()
       : true;
 
     const scheduleData: Record<string, any> = {
-      enrollmentId: row.enrollmentId,
-      lessonNumber: row.lessonNumber,
-      scheduledAt: scheduledDate.toISOString(),
-      notification1hId: existingSchedule?.notification1hId ?? null,
-      notification24hId: existingSchedule?.notification24hId ?? null,
+      ...(scheduleTable === "lessonSchedules"
+        ? {
+            enrollmentId: row.enrollmentId,
+            lessonNumber: row.lessonNumber,
+            scheduledAt: scheduledDate.toISOString(),
+            notification1hId:
+              existingSchedule?.notification1hId ??
+              existingSchedule?.notification_1h_id ??
+              null,
+            notification24hId:
+              existingSchedule?.notification24hId ??
+              existingSchedule?.notification_24h_id ??
+              null,
+          }
+        : {
+            enrollment_id: row.enrollmentId,
+            lesson_number: row.lessonNumber,
+            scheduled_at: scheduledDate.toISOString(),
+            notification_1h_id:
+              existingSchedule?.notification_1h_id ??
+              existingSchedule?.notification1hId ??
+              null,
+            notification_24h_id:
+              existingSchedule?.notification_24h_id ??
+              existingSchedule?.notification24hId ??
+              null,
+          }),
     };
 
     if (timeChanged && existingSchedule) {
-      if (existingSchedule.notification1hId) {
-        await cancelNotification(existingSchedule.notification1hId);
-        scheduleData.notification1hId = null;
+      const old1h =
+        existingSchedule.notification1hId ?? existingSchedule.notification_1h_id;
+      const old24h =
+        existingSchedule.notification24hId ?? existingSchedule.notification_24h_id;
+
+      if (old1h) {
+        await cancelNotification(old1h);
+        if (scheduleTable === "lessonSchedules") scheduleData.notification1hId = null;
+        else scheduleData.notification_1h_id = null;
       }
-      if (existingSchedule.notification24hId) {
-        await cancelNotification(existingSchedule.notification24hId);
-        scheduleData.notification24hId = null;
+      if (old24h) {
+        await cancelNotification(old24h);
+        if (scheduleTable === "lessonSchedules") scheduleData.notification24hId = null;
+        else scheduleData.notification_24h_id = null;
       }
     }
 
     if (timeChanged) {
-      const { data: enrollment, error: enrollmentErr } = await supabaseAdmin
+      let { data: enrollment, error: enrollmentErr } = await supabaseAdmin
         .from("courseEnrollments")
         .select("userId")
         .eq("id", row.enrollmentId)
         .limit(1)
         .maybeSingle();
+      if (enrollmentErr && isSchemaError(enrollmentErr)) {
+        ({ data: enrollment, error: enrollmentErr } = await supabaseAdmin
+          .from("course_enrollments")
+          .select("user_id")
+          .eq("id", row.enrollmentId)
+          .limit(1)
+          .maybeSingle());
+      }
       if (enrollmentErr && enrollmentErr.code !== "PGRST116") throw enrollmentErr;
 
-      if (enrollment?.userId) {
-        const userId = String(enrollment.userId);
+      const enrollmentUserId = enrollment?.userId ?? enrollment?.user_id;
+      if (enrollmentUserId) {
+        const userId = String(enrollmentUserId);
         const now = new Date();
 
         const time24h = new Date(scheduledDate.getTime() - 24 * 60 * 60 * 1000);
@@ -269,7 +352,10 @@ async function handleLessonSchedulesImport(rows: any[]) {
             includeExternalUserIds: [userId],
             send_after: time24h,
           });
-          if (id24h) scheduleData.notification24hId = id24h;
+          if (id24h) {
+            if (scheduleTable === "lessonSchedules") scheduleData.notification24hId = id24h;
+            else scheduleData.notification_24h_id = id24h;
+          }
         }
 
         const time1h = new Date(scheduledDate.getTime() - 60 * 60 * 1000);
@@ -283,19 +369,22 @@ async function handleLessonSchedulesImport(rows: any[]) {
             includeExternalUserIds: [userId],
             send_after: time1h,
           });
-          if (id1h) scheduleData.notification1hId = id1h;
+          if (id1h) {
+            if (scheduleTable === "lessonSchedules") scheduleData.notification1hId = id1h;
+            else scheduleData.notification_1h_id = id1h;
+          }
         }
       }
     }
 
     if (existingSchedule?.id) {
       const { error } = await supabaseAdmin
-        .from("lessonSchedules")
+        .from(scheduleTable)
         .update(scheduleData)
         .eq("id", existingSchedule.id);
       if (error) throw error;
     } else {
-      const { error } = await supabaseAdmin.from("lessonSchedules").insert(scheduleData);
+      const { error } = await supabaseAdmin.from(scheduleTable).insert(scheduleData);
       if (error) throw error;
     }
 
@@ -304,4 +393,3 @@ async function handleLessonSchedulesImport(rows: any[]) {
 
   return count;
 }
-
