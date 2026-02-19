@@ -72,11 +72,27 @@ export async function handle(request: Request) {
         userName: row.userName ?? "",
         roomName: row.roomName ?? "",
       })),
-      courseEnrollments: courseEnrollments.map((row: any) => ({
-        ...row,
-        studentName: row.studentName ?? "",
-        studentEmail: row.studentEmail ?? "",
-      })),
+      courseEnrollments: courseEnrollments.map((row: any) => {
+        const userId = readField<string | number>(row, "userId", "user_id");
+        const courseId = readField<string | number>(row, "courseId", "course_id");
+        const user = (users ?? []).find(
+          (u: any) => String(readField(u, "id")) === String(userId)
+        );
+        const course = (courses ?? []).find(
+          (c: any) => String(readField(c, "id")) === String(courseId)
+        );
+        return {
+          ...row,
+          studentName:
+            row.studentName ??
+            user?.displayName ??
+            user?.displayname ??
+            user?.email ??
+            "",
+          studentEmail: row.studentEmail ?? user?.email ?? "",
+          courseName: row.courseName ?? course?.name ?? "",
+        };
+      }),
       lessonCompletions,
       lessonSchedules: (() => {
         const existing = Array.isArray(lessonSchedules) ? lessonSchedules : [];
