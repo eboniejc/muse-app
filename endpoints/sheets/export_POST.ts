@@ -48,6 +48,23 @@ async function safeSelectCourses() {
   return data ?? [];
 }
 
+async function safeSelectEbooks() {
+  const rows = await safeSelectAll("ebooks");
+  if (rows.length > 0) return rows;
+
+  let { data, error } = await supabaseAdmin.from("ebooks").select("*");
+  if (error) {
+    const snake = await supabaseAdmin.from("e_books").select("*");
+    data = snake.data;
+    error = snake.error;
+  }
+  if (error) {
+    console.error("Sheets export: failed Supabase query for ebooks:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
 async function safeSelectLessonSchedules() {
   const rows = await safeSelectAll("lessonSchedules");
   if (rows.length > 0) return rows;
@@ -114,7 +131,7 @@ export async function handle(request: Request) {
       userProfiles,
     ] = await Promise.all([
       safeSelectCourses(),
-      safeSelectAll("ebooks"),
+      safeSelectEbooks(),
       safeSelectAll("rooms"),
       safeSelectAll("roomBookings"),
       safeSelectCourseEnrollments(),
