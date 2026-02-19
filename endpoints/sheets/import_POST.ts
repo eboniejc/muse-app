@@ -1,4 +1,3 @@
-import { db } from "../../helpers/db";
 import { validateSheetsApiKey } from "../../helpers/validateSheetsApiKey";
 import { schema, OutputType } from "./import_POST.schema";
 import superjson from "superjson";
@@ -6,6 +5,120 @@ import {
   sendPushNotification,
   cancelNotification,
 } from "../../helpers/sendPushNotification";
+import { supabaseAdmin } from "../../helpers/supabaseServer";
+
+const TABLE_COLUMNS: Record<string, Set<string>> = {
+  courses: new Set([
+    "id",
+    "name",
+    "description",
+    "totalLessons",
+    "maxStudents",
+    "skillLevel",
+    "price",
+    "isActive",
+    "instructorId",
+  ]),
+  ebooks: new Set([
+    "id",
+    "title",
+    "titleVi",
+    "description",
+    "descriptionVi",
+    "coverImageUrl",
+    "fileUrl",
+    "courseId",
+    "sortOrder",
+    "isActive",
+  ]),
+  rooms: new Set([
+    "id",
+    "name",
+    "description",
+    "roomType",
+    "capacity",
+    "equipment",
+    "isActive",
+    "hourlyRate",
+  ]),
+  roomBookings: new Set([
+    "id",
+    "userId",
+    "roomId",
+    "startTime",
+    "endTime",
+    "status",
+    "notes",
+  ]),
+  courseEnrollments: new Set([
+    "id",
+    "userId",
+    "courseId",
+    "status",
+    "progressPercentage",
+    "enrolledAt",
+    "completedAt",
+  ]),
+  lessonCompletions: new Set([
+    "id",
+    "enrollmentId",
+    "lessonNumber",
+    "markedBy",
+    "completedAt",
+  ]),
+  lessonSchedules: new Set([
+    "id",
+    "enrollmentId",
+    "lessonNumber",
+    "scheduledAt",
+    "notification1hId",
+    "notification24hId",
+  ]),
+  users: new Set([
+    "id",
+    "email",
+    "displayName",
+    "avatarUrl",
+    "role",
+    "whatsappNumber",
+  ]),
+  userProfiles: new Set([
+    "id",
+    "userId",
+    "fullName",
+    "gender",
+    "address",
+    "phoneNumber",
+    "dateOfBirth",
+    "preferredPaymentMethod",
+    "bankAccountName",
+    "bankAccountNumber",
+    "bankName",
+    "registrationCompleted",
+  ]),
+};
+
+function pickAllowed(table: string, row: Record<string, any>) {
+  const allowed = TABLE_COLUMNS[table];
+  const cleaned: Record<string, any> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (allowed?.has(key)) {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
+function normalizeLessonScheduleRow(row: Record<string, any>) {
+  return {
+    id: row.id ?? null,
+    enrollmentId: row.enrollmentId ?? row.enrollment_id ?? null,
+    lessonNumber: row.lessonNumber ?? row.lesson_number ?? null,
+    scheduledAt: row.scheduledAt ?? row.scheduled_at ?? null,
+    notification1hId: row.notification1hId ?? row.notification_1h_id ?? null,
+    notification24hId: row.notification24hId ?? row.notification_24h_id ?? null,
+  };
+}
 
 export async function handle(request: Request) {
   try {
@@ -14,10 +127,8 @@ export async function handle(request: Request) {
       return validation.response;
     }
 
-    // Do not use request.json(), use superjson parsing
     const json = superjson.parse(await request.text());
     const input = schema.parse(json);
-
     const { table, rows } = input;
 
     if (rows.length === 0) {
@@ -32,42 +143,25 @@ export async function handle(request: Request) {
 
     let processedCount = 0;
 
-    // Handle generic upserts for most tables, specific logic for lessonSchedules
     if (table === "lessonSchedules") {
       processedCount = await handleLessonSchedulesImport(rows);
     } else {
-      // For other tables, we perform a standard upsert.
-      // We loop and upsert one by one for safety and flexibility with dynamic table names.
-      for (const row of rows) {
-        // Remove null ID if it exists (let DB generate it) or keep it if it's an update
+      for (const rawRow of rows) {
+        const row = pickAllowed(table, rawRow as Record<string, any>);
+        if (!Object.keys(row).length) continue;
+
         if (!row.id) {
           delete row.id;
-        }
-
-        const rowAny = row as any;
-
-        // If ID exists, try to update, otherwise insert
-        if (row.id) {
-          const existing = await db
-            .selectFrom(table as any)
-            .selectAll()
-            .where("id", "=", row.id)
-            .executeTakeFirst();
-
-          if (existing) {
-            await db
-              .updateTable(table as any)
-              .set(rowAny)
-              .where("id", "=", row.id)
-              .execute();
-          } else {
-            await db.insertInto(table as any).values(rowAny).execute();
-          }
+          const { error } = await supabaseAdmin.from(table).insert(row);
+          if (error) throw error;
         } else {
-          await db.insertInto(table as any).values(rowAny).execute();
+          const { error } = await supabaseAdmin
+            .from(table)
+            .upsert(row, { onConflict: "id" });
+          if (error) throw error;
         }
+        processedCount++;
       }
-      processedCount = rows.length;
     }
 
     return new Response(
@@ -78,7 +172,6 @@ export async function handle(request: Request) {
     );
   } catch (error) {
     console.error("Error importing sheets data:", error);
-    // Return error message
     return new Response(
       superjson.stringify({
         success: false,
@@ -93,64 +186,48 @@ export async function handle(request: Request) {
 async function handleLessonSchedulesImport(rows: any[]) {
   let count = 0;
 
-  for (const row of rows) {
-    const {
-      enrollmentId,
-      lessonNumber,
-      scheduledAt,
-      id, // Might be present if updating
-      notification1hId,
-      notification24hId,
-      ...otherFields
-    } = row;
-
-    if (!enrollmentId || !lessonNumber || !scheduledAt) {
-      console.warn("Skipping invalid lesson schedule row", row);
+  for (const raw of rows) {
+    const row = normalizeLessonScheduleRow(raw);
+    if (!row.enrollmentId || !row.lessonNumber || !row.scheduledAt) {
       continue;
     }
 
-    const scheduledDate = new Date(scheduledAt);
+    const scheduledDate = new Date(row.scheduledAt);
+    let existingSchedule: any = null;
 
-    // 1. Check for existing schedule
-    let existingSchedule;
-    if (id) {
-      existingSchedule = await db
-        .selectFrom("lessonSchedules")
-        .selectAll()
-        .where("id", "=", id)
-        .executeTakeFirst();
+    if (row.id) {
+      const { data, error } = await supabaseAdmin
+        .from("lessonSchedules")
+        .select("*")
+        .eq("id", row.id)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      existingSchedule = data;
     } else {
-      // Fallback: try to find by enrollmentId + lessonNumber
-      existingSchedule = await db
-        .selectFrom("lessonSchedules")
-        .selectAll()
-        .where("enrollmentId", "=", enrollmentId)
-        .where("lessonNumber", "=", lessonNumber)
-        .executeTakeFirst();
+      const { data, error } = await supabaseAdmin
+        .from("lessonSchedules")
+        .select("*")
+        .eq("enrollmentId", row.enrollmentId)
+        .eq("lessonNumber", row.lessonNumber)
+        .limit(1)
+        .maybeSingle();
+      if (error && error.code !== "PGRST116") throw error;
+      existingSchedule = data;
     }
 
-    // Determine if we need to reschedule notifications
-    // Reschedule if:
-    // - It's a new record
-    // - The scheduled time has changed
-    // - (Optional) The user manually cleared notification IDs in sheet to force resend (handled if IDs are missing in DB but logic here depends on `existingSchedule`)
     const timeChanged = existingSchedule
-      ? new Date(existingSchedule.scheduledAt).getTime() !==
-        scheduledDate.getTime()
+      ? new Date(existingSchedule.scheduledAt).getTime() !== scheduledDate.getTime()
       : true;
 
-    // Prepare the record data
-    const scheduleData = {
-      enrollmentId,
-      lessonNumber,
-      scheduledAt: scheduledDate,
-      ...otherFields,
-      // We will set notification IDs later if we schedule them
+    const scheduleData: Record<string, any> = {
+      enrollmentId: row.enrollmentId,
+      lessonNumber: row.lessonNumber,
+      scheduledAt: scheduledDate.toISOString(),
       notification1hId: existingSchedule?.notification1hId ?? null,
       notification24hId: existingSchedule?.notification24hId ?? null,
     };
 
-    // If time changed, cancel old notifications
     if (timeChanged && existingSchedule) {
       if (existingSchedule.notification1hId) {
         await cancelNotification(existingSchedule.notification1hId);
@@ -162,20 +239,19 @@ async function handleLessonSchedulesImport(rows: any[]) {
       }
     }
 
-    // Schedule new notifications if needed
     if (timeChanged) {
-      // Need userId to target notification
-      const enrollment = await db
-        .selectFrom("courseEnrollments")
+      const { data: enrollment, error: enrollmentErr } = await supabaseAdmin
+        .from("courseEnrollments")
         .select("userId")
-        .where("id", "=", enrollmentId)
-        .executeTakeFirst();
+        .eq("id", row.enrollmentId)
+        .limit(1)
+        .maybeSingle();
+      if (enrollmentErr && enrollmentErr.code !== "PGRST116") throw enrollmentErr;
 
-      if (enrollment) {
+      if (enrollment?.userId) {
         const userId = String(enrollment.userId);
         const now = new Date();
 
-        // 24h Notification
         const time24h = new Date(scheduledDate.getTime() - 24 * 60 * 60 * 1000);
         if (time24h > now) {
           const id24h = await sendPushNotification({
@@ -193,12 +269,9 @@ async function handleLessonSchedulesImport(rows: any[]) {
             includeExternalUserIds: [userId],
             send_after: time24h,
           });
-          if (id24h) {
-            scheduleData.notification24hId = id24h;
-          }
+          if (id24h) scheduleData.notification24hId = id24h;
         }
 
-        // 1h Notification
         const time1h = new Date(scheduledDate.getTime() - 60 * 60 * 1000);
         if (time1h > now) {
           const id1h = await sendPushNotification({
@@ -210,28 +283,25 @@ async function handleLessonSchedulesImport(rows: any[]) {
             includeExternalUserIds: [userId],
             send_after: time1h,
           });
-          if (id1h) {
-            scheduleData.notification1hId = id1h;
-          }
+          if (id1h) scheduleData.notification1hId = id1h;
         }
       }
-    } else {
-        // If time didn't change, preserve existing notification IDs (already set in initial object)
-        // unless passed explicitly in row which we are ignoring for now to let system manage it.
     }
 
-    // Upsert the schedule
-    if (existingSchedule) {
-      await db
-        .updateTable("lessonSchedules")
-        .set(scheduleData)
-        .where("id", "=", existingSchedule.id)
-        .execute();
+    if (existingSchedule?.id) {
+      const { error } = await supabaseAdmin
+        .from("lessonSchedules")
+        .update(scheduleData)
+        .eq("id", existingSchedule.id);
+      if (error) throw error;
     } else {
-      await db.insertInto("lessonSchedules").values(scheduleData).execute();
+      const { error } = await supabaseAdmin.from("lessonSchedules").insert(scheduleData);
+      if (error) throw error;
     }
+
     count++;
   }
 
   return count;
 }
+
