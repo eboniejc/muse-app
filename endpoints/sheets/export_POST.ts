@@ -26,6 +26,28 @@ async function safeSelectCourseEnrollments() {
   return data ?? [];
 }
 
+async function safeSelectUsers() {
+  const rows = await safeSelectAll("users");
+  if (rows.length > 0) return rows;
+  const { data, error } = await supabaseAdmin.from("users").select("*");
+  if (error) {
+    console.error("Sheets export: failed Supabase query for users:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
+async function safeSelectCourses() {
+  const rows = await safeSelectAll("courses");
+  if (rows.length > 0) return rows;
+  const { data, error } = await supabaseAdmin.from("courses").select("*");
+  if (error) {
+    console.error("Sheets export: failed Supabase query for courses:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
 function readField<T = unknown>(row: Record<string, any>, ...keys: string[]): T | undefined {
   for (const key of keys) {
     if (row[key] !== undefined) return row[key] as T;
@@ -52,14 +74,14 @@ export async function handle(request: Request) {
       users,
       userProfiles,
     ] = await Promise.all([
-      safeSelectAll("courses"),
+      safeSelectCourses(),
       safeSelectAll("ebooks"),
       safeSelectAll("rooms"),
       safeSelectAll("roomBookings"),
       safeSelectCourseEnrollments(),
       safeSelectAll("lessonCompletions"),
       safeSelectAll("lessonSchedules"),
-      safeSelectAll("users"),
+      safeSelectUsers(),
       safeSelectAll("userProfiles"),
     ]);
 
