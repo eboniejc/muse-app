@@ -7,6 +7,8 @@ import {
 } from "../../helpers/sendPushNotification";
 import { supabaseAdmin } from "../../helpers/supabaseServer";
 
+const MAX_LESSONS = 16;
+
 const TABLE_COLUMNS: Record<string, Set<string>> = {
   courses: new Set([
     "id",
@@ -120,6 +122,35 @@ function normalizeLessonScheduleRow(row: Record<string, any>) {
   };
 }
 
+function getFromRow(row: Record<string, any>, keys: string[]): any {
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
+      return row[key];
+    }
+  }
+  return null;
+}
+
+function parseLessonNumber(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(1, Math.floor(value));
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.max(1, Math.floor(parsed));
+    const match = value.match(/(\d+)/);
+    if (match) return Math.max(1, Number(match[1]));
+  }
+  return fallback;
+}
+
+function normalizeDateToIso(value: unknown): string | null {
+  if (!value) return null;
+  const date = new Date(value as any);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 function isSchemaError(error: any): boolean {
   const message = String(error?.message ?? "");
   return (
@@ -167,7 +198,9 @@ export async function handle(request: Request) {
 
     let processedCount = 0;
 
-    if (table === "lessonSchedules") {
+    if (table === "flattenedEnrollments") {
+      processedCount = await handleFlattenedEnrollmentsImport(rows);
+    } else if (table === "lessonSchedules") {
       processedCount = await handleLessonSchedulesImport(rows);
     } else {
       for (const rawRow of rows) {
@@ -205,6 +238,109 @@ export async function handle(request: Request) {
       { status: 500 }
     );
   }
+}
+
+async function handleFlattenedEnrollmentsImport(rows: any[]) {
+  const { data: users, error: usersError } = await supabaseAdmin
+    .from("users")
+    .select("id,email");
+  if (usersError) throw usersError;
+
+  const { data: courses, error: coursesError } = await supabaseAdmin
+    .from("courses")
+    .select("id,name");
+  if (coursesError) throw coursesError;
+
+  const { data: enrollments, error: enrollmentsError } = await supabaseAdmin
+    .from("courseEnrollments")
+    .select("id,userId,courseId,status,progressPercentage,enrolledAt,completedAt");
+  if (enrollmentsError) throw enrollmentsError;
+
+  const userIdByEmail = new Map(
+    (users ?? []).map((u: any) => [String(u.email ?? "").toLowerCase().trim(), u.id])
+  );
+  const courseIdByName = new Map(
+    (courses ?? []).map((c: any) => [String(c.name ?? "").toLowerCase().trim(), c.id])
+  );
+  const enrollmentByKey = new Map(
+    (enrollments ?? []).map((e: any) => [`${e.userId}-${e.courseId}`, e])
+  );
+
+  const scheduleRows: Array<Record<string, any>> = [];
+  let processedEnrollments = 0;
+
+  for (const rawRow of rows as Array<Record<string, any>>) {
+    const row = rawRow ?? {};
+    const emailRaw = getFromRow(row, ["email", "studentEmail", "userEmail", "Email"]);
+    const email = String(emailRaw ?? "").toLowerCase().trim();
+    if (!email) continue;
+
+    const userId = userIdByEmail.get(email);
+    if (!userId) continue;
+
+    const courseIdRaw = getFromRow(row, ["courseId", "Course ID"]);
+    let courseId =
+      courseIdRaw !== null && courseIdRaw !== undefined && courseIdRaw !== ""
+        ? Number(courseIdRaw)
+        : null;
+
+    if (!courseId || Number.isNaN(courseId)) {
+      const courseNameRaw = getFromRow(row, ["courseName", "Course"]);
+      const courseName = String(courseNameRaw ?? "").toLowerCase().trim();
+      if (!courseName) continue;
+      courseId = courseIdByName.get(courseName) ?? null;
+    }
+    if (!courseId) continue;
+
+    const enrollmentKey = `${userId}-${courseId}`;
+    let enrollment = enrollmentByKey.get(enrollmentKey);
+    if (!enrollment) {
+      const insertPayload = {
+        userId,
+        courseId,
+        status: "active",
+        progressPercentage: 0,
+        enrolledAt: new Date().toISOString(),
+        completedAt: null,
+      };
+      const { data, error } = await supabaseAdmin
+        .from("courseEnrollments")
+        .insert(insertPayload)
+        .select("id,userId,courseId,status,progressPercentage,enrolledAt,completedAt")
+        .single();
+      if (error) throw error;
+      enrollment = data;
+      enrollmentByKey.set(enrollmentKey, enrollment);
+    }
+    if (!enrollment?.id) continue;
+    processedEnrollments++;
+
+    for (let i = 1; i <= MAX_LESSONS; i++) {
+      const dtValue = getFromRow(row, [
+        `lesson${i}DateTime`,
+        `Lesson ${i} Date/Time`,
+        `lesson${i}At`,
+      ]);
+      const scheduledAt = normalizeDateToIso(dtValue);
+      if (!scheduledAt) continue;
+
+      const lessonValue = getFromRow(row, [
+        `lesson${i}Ebook`,
+        `Lesson ${i} Ebook`,
+        `lesson${i}LessonNumber`,
+      ]);
+      const lessonNumber = parseLessonNumber(lessonValue, i);
+
+      scheduleRows.push({
+        enrollmentId: enrollment.id,
+        lessonNumber,
+        scheduledAt,
+      });
+    }
+  }
+
+  const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
+  return processedEnrollments + scheduleCount;
 }
 
 async function handleLessonSchedulesImport(rows: any[]) {
