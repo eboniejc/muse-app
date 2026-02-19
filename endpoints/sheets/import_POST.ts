@@ -267,6 +267,7 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
   );
 
   const scheduleRows: Array<Record<string, any>> = [];
+  const scheduleDeletes: Array<{ enrollmentId: string | number; lessonNumber: number }> = [];
   let processedEnrollments = 0;
 
   for (const rawRow of rows as Array<Record<string, any>>) {
@@ -321,15 +322,21 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
         `Lesson ${i} Date/Time`,
         `lesson${i}At`,
       ]);
-      const scheduledAt = normalizeDateToIso(dtValue);
-      if (!scheduledAt) continue;
-
       const lessonValue = getFromRow(row, [
         `lesson${i}Ebook`,
         `Lesson ${i} Ebook`,
         `lesson${i}LessonNumber`,
       ]);
       const lessonNumber = parseLessonNumber(lessonValue, i);
+      const scheduledAt = normalizeDateToIso(dtValue);
+
+      if (!scheduledAt) {
+        scheduleDeletes.push({
+          enrollmentId: enrollment.id,
+          lessonNumber,
+        });
+        continue;
+      }
 
       scheduleRows.push({
         enrollmentId: enrollment.id,
@@ -339,8 +346,60 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
     }
   }
 
+  const deleteCount = await handleLessonSchedulesDelete(scheduleDeletes);
   const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
-  return processedEnrollments + scheduleCount;
+  return processedEnrollments + scheduleCount + deleteCount;
+}
+
+async function handleLessonSchedulesDelete(
+  rows: Array<{ enrollmentId: string | number; lessonNumber: number }>
+) {
+  let count = 0;
+  if (!rows.length) return count;
+
+  for (const row of rows) {
+    let scheduleTable = "lessonSchedules";
+    let existing: any = null;
+
+    let { data, error } = await supabaseAdmin
+      .from("lessonSchedules")
+      .select("*")
+      .eq("enrollmentId", row.enrollmentId)
+      .eq("lessonNumber", row.lessonNumber)
+      .limit(1)
+      .maybeSingle();
+
+    if (error && isSchemaError(error)) {
+      scheduleTable = "lesson_schedules";
+      ({ data, error } = await supabaseAdmin
+        .from("lesson_schedules")
+        .select("*")
+        .eq("enrollment_id", row.enrollmentId)
+        .eq("lesson_number", row.lessonNumber)
+        .limit(1)
+        .maybeSingle());
+    }
+
+    if (error && error.code !== "PGRST116") throw error;
+    existing = data;
+    if (!existing?.id) continue;
+
+    const old1h = existing.notification1hId ?? existing.notification_1h_id;
+    const old24h = existing.notification24hId ?? existing.notification_24h_id;
+
+    if (old1h) await cancelNotification(old1h);
+    if (old24h) await cancelNotification(old24h);
+
+    const { error: deleteError } = await supabaseAdmin
+      .from(scheduleTable)
+      .delete()
+      .eq("id", existing.id);
+    if (deleteError) throw deleteError;
+
+    count++;
+  }
+
+  return count;
 }
 
 async function handleLessonSchedulesImport(rows: any[]) {
