@@ -3,7 +3,7 @@ import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../helpers/useAuth";
-import { useRoomBookings } from "../helpers/useRoomBookings";
+import { useUpcomingLessons } from "../helpers/useUpcomingLessons";
 import { useCourseEnrollments } from "../helpers/useCourseEnrollments";
 import { Button } from "../components/Button";
 import { Skeleton } from "../components/Skeleton";
@@ -16,14 +16,12 @@ export default function DashboardPage() {
   const { authState } = useAuth();
   const user = authState.type === "authenticated" ? authState.user : null;
   
-  const { data: bookings, isLoading: bookingsLoading } = useRoomBookings({
-    startDate: new Date(), // Fetch bookings from today onwards
-  });
+  const { data: lessons, isLoading: lessonsLoading } = useUpcomingLessons();
   
   const { data: enrollments, isLoading: enrollmentsLoading } = useCourseEnrollments();
 
   // Calculate stats
-  const upcomingBookingsCount = bookings?.filter(b => b.status === "confirmed").length || 0;
+  const upcomingBookingsCount = lessons?.length || 0;
   const activeCoursesCount = enrollments?.filter(e => e.status === "active").length || 0;
   
   // Mock practice hours (since we don't have historical data API easily available in this context)
@@ -84,22 +82,24 @@ export default function DashboardPage() {
           </div>
           
           <div className={styles.list}>
-            {bookingsLoading ? (
+            {lessonsLoading ? (
               <Skeleton className="h-20 w-full" />
-            ) : bookings && bookings.length > 0 ? (
-              bookings.slice(0, 3).map((booking) => (
-                <div key={booking.id} className={styles.listItem}>
+            ) : lessons && lessons.length > 0 ? (
+              lessons.slice(0, 3).map((lesson) => (
+                <div key={lesson.id} className={styles.listItem}>
                   <div className={styles.dateBox}>
-                    <span className={styles.day}>{format(new Date(booking.startTime), "dd")}</span>
-                    <span className={styles.month}>{format(new Date(booking.startTime), "MMM")}</span>
+                    <span className={styles.day}>{format(new Date(lesson.scheduledAt), "dd")}</span>
+                    <span className={styles.month}>{format(new Date(lesson.scheduledAt), "MMM")}</span>
                   </div>
                   <div className={styles.itemDetails}>
-                    <h3 className={styles.itemTitle}>{booking.roomName}</h3>
+                    <h3 className={styles.itemTitle}>
+                      {lesson.courseName} - Lesson {lesson.lessonNumber}
+                    </h3>
                     <p className={styles.itemSub}>
-                      {format(new Date(booking.startTime), "h:mm a")} - {format(new Date(booking.endTime), "h:mm a")}
+                      {format(new Date(lesson.scheduledAt), "h:mm a")}
                     </p>
                   </div>
-                  <div className={styles.statusIndicator} data-status={booking.status} />
+                  <div className={styles.statusIndicator} data-status="confirmed" />
                 </div>
               ))
             ) : (
