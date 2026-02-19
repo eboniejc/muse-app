@@ -48,6 +48,45 @@ async function safeSelectCourses() {
   return data ?? [];
 }
 
+async function safeSelectLessonSchedules() {
+  const rows = await safeSelectAll("lessonSchedules");
+  if (rows.length > 0) return rows;
+
+  let { data, error } = await supabaseAdmin.from("lessonSchedules").select("*");
+  if (error) {
+    const snake = await supabaseAdmin.from("lesson_schedules").select("*");
+    data = snake.data;
+    error = snake.error;
+  }
+  if (error) {
+    console.error("Sheets export: failed Supabase query for lesson schedules:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
+async function safeSelectUserProfiles() {
+  const rows = await safeSelectAll("userProfiles");
+  if (rows.length > 0) return rows;
+
+  let { data, error } = await supabaseAdmin.from("userProfiles").select("*");
+  if (error) {
+    const lower = await supabaseAdmin.from("userprofiles").select("*");
+    data = lower.data;
+    error = lower.error;
+  }
+  if (error) {
+    const snake = await supabaseAdmin.from("user_profiles").select("*");
+    data = snake.data;
+    error = snake.error;
+  }
+  if (error) {
+    console.error("Sheets export: failed Supabase query for user profiles:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
 function readField<T = unknown>(row: Record<string, any>, ...keys: string[]): T | undefined {
   for (const key of keys) {
     if (row[key] !== undefined) return row[key] as T;
@@ -80,9 +119,9 @@ export async function handle(request: Request) {
       safeSelectAll("roomBookings"),
       safeSelectCourseEnrollments(),
       safeSelectAll("lessonCompletions"),
-      safeSelectAll("lessonSchedules"),
+      safeSelectLessonSchedules(),
       safeSelectUsers(),
-      safeSelectAll("userProfiles"),
+      safeSelectUserProfiles(),
     ]);
 
     const exportData = {
