@@ -26,6 +26,13 @@ async function safeSelectCourseEnrollments() {
   return data ?? [];
 }
 
+function readField<T = unknown>(row: Record<string, any>, ...keys: string[]): T | undefined {
+  for (const key of keys) {
+    if (row[key] !== undefined) return row[key] as T;
+  }
+  return undefined;
+}
+
 export async function handle(request: Request) {
   try {
     const validation = validateSheetsApiKey(request);
@@ -71,7 +78,55 @@ export async function handle(request: Request) {
         studentEmail: row.studentEmail ?? "",
       })),
       lessonCompletions,
-      lessonSchedules,
+      lessonSchedules: (() => {
+        const existing = Array.isArray(lessonSchedules) ? lessonSchedules : [];
+        const existingKeySet = new Set(
+          existing.map((row: any) => {
+            const enrollmentId = readField<string | number>(
+              row,
+              "enrollmentId",
+              "enrollment_id"
+            );
+            const lessonNumber = readField<string | number>(
+              row,
+              "lessonNumber",
+              "lesson_number"
+            );
+            return `${enrollmentId}-${lessonNumber}`;
+          })
+        );
+
+        const courseMap = new Map(
+          (courses ?? []).map((course: any) => [
+            String(readField(course, "id")),
+            Number(readField(course, "totalLessons", "total_lessons") ?? 0),
+          ])
+        );
+
+        const templateRows: any[] = [];
+        for (const enrollment of courseEnrollments ?? []) {
+          const enrollmentId = readField<number | string>(enrollment, "id");
+          const courseId = readField<number | string>(
+            enrollment,
+            "courseId",
+            "course_id"
+          );
+          const totalLessons = courseMap.get(String(courseId)) ?? 0;
+          for (let lessonNumber = 1; lessonNumber <= totalLessons; lessonNumber++) {
+            const key = `${enrollmentId}-${lessonNumber}`;
+            if (existingKeySet.has(key)) continue;
+            templateRows.push({
+              enrollmentId,
+              lessonNumber,
+              scheduledAt: null,
+              notification1hId: null,
+              notification24hId: null,
+            });
+          }
+        }
+
+        return [...existing, ...templateRows];
+      })(),
       users,
       userProfiles,
     };
