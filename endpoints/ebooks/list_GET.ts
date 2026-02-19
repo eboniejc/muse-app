@@ -1,7 +1,7 @@
-import { db } from "../../helpers/db";
 import { getServerUserSession } from "../../helpers/getServerUserSession";
 import superjson from "superjson";
 import { OutputType } from "./list_GET.schema";
+import { supabaseAdmin } from "../../helpers/supabaseServer";
 
 const orderedEbookLinks = [
   "https://drive.google.com/file/d/161qr5Le9QUn_TaB3RGWeWEGLOhBM-u_r/view?usp=drive_link",
@@ -39,123 +39,205 @@ const fallbackEbooks: OutputType["ebooks"] = orderedEbookLinks.map(
   })
 );
 
-function isSchemaOrMissingTableError(error: unknown): boolean {
-  const maybeErr = error as { code?: string; message?: string } | null;
-  if (!maybeErr) return false;
+function isSchemaError(error: any): boolean {
+  const message = String(error?.message ?? "");
   return (
-    maybeErr.code === "42703" ||
-    maybeErr.code === "42P01" ||
-    maybeErr.code === "PGRST205" ||
-    maybeErr.message?.includes("does not exist") === true ||
-    maybeErr.message?.includes("schema cache") === true
+    error?.code === "PGRST205" ||
+    error?.code === "PGRST204" ||
+    error?.code === "42P01" ||
+    message.includes("schema cache") ||
+    message.includes("does not exist")
   );
+}
+
+function readField<T = unknown>(row: Record<string, any>, ...keys: string[]): T | undefined {
+  for (const key of keys) {
+    if (row[key] !== undefined) return row[key] as T;
+  }
+  return undefined;
 }
 
 export async function handle(request: Request) {
   try {
     const { user } = await getServerUserSession(request);
 
-    // Fetch ebooks and join with courses to get course name
-    const ebooks = await db
-      .selectFrom("ebooks")
-      .leftJoin("courses", "ebooks.courseId", "courses.id")
-      .select([
-        "ebooks.id",
-        "ebooks.title",
-        "ebooks.titleVi",
-        "ebooks.description",
-        "ebooks.descriptionVi",
-        "ebooks.coverImageUrl",
-        "ebooks.fileUrl",
-        "ebooks.courseId",
-        "ebooks.sortOrder",
-        "courses.name as courseName",
-      ])
-      .where("ebooks.isActive", "=", true)
-      .orderBy("ebooks.courseId")
-      .orderBy("ebooks.sortOrder")
-      .execute();
-
-    // Get user's active or completed enrollments
-    const enrollments = await db
-      .selectFrom("courseEnrollments")
-      .select(["id", "courseId"])
-      .where("userId", "=", user.id)
-      .where("status", "in", ["active", "completed"])
-      .execute();
-
-    const enrollmentIds = enrollments.map((e) => e.id);
-    const enrollmentByCourseId = new Map(
-      enrollments.map((e) => [e.courseId, e.id])
-    );
-
-    // Get lesson completions for these enrollments
-    let lessonCompletions: { enrollmentId: number; lessonNumber: number }[] = [];
-    if (enrollmentIds.length > 0) {
-      lessonCompletions = await db
-        .selectFrom("lessonCompletions")
-        .select(["enrollmentId", "lessonNumber"])
-        .where("enrollmentId", "in", enrollmentIds)
-        .execute();
+    let ebooks: any[] = [];
+    {
+      const { data, error } = await supabaseAdmin
+        .from("ebooks")
+        .select("*")
+        .eq("isActive", true)
+        .order("courseId", { ascending: true })
+        .order("sortOrder", { ascending: true });
+      if (error) {
+        console.error("Error loading ebooks:", error);
+        return new Response(
+          superjson.stringify({ ebooks: fallbackEbooks } satisfies OutputType)
+        );
+      }
+      ebooks = data ?? [];
     }
 
-    // Build a set of completed lessons: "enrollmentId-lessonNumber"
-    const completedLessonsSet = new Set(
-      lessonCompletions.map((lc) => `${lc.enrollmentId}-${lc.lessonNumber}`)
+    let enrollments: any[] = [];
+    {
+      let { data, error } = await supabaseAdmin
+        .from("courseEnrollments")
+        .select("id,courseId,userId,status")
+        .eq("userId", user.id as any)
+        .in("status", ["active", "completed"]);
+      if (error && isSchemaError(error)) {
+        const snake = await supabaseAdmin
+          .from("course_enrollments")
+          .select("id,course_id,user_id,status")
+          .eq("user_id", user.id as any)
+          .in("status", ["active", "completed"]);
+        if (!snake.error) {
+          data = (snake.data ?? []).map((e: any) => ({
+            id: e.id,
+            courseId: e.course_id,
+            userId: e.user_id,
+            status: e.status,
+          }));
+          error = null;
+        }
+      }
+      if (error) throw error;
+      enrollments = data ?? [];
+    }
+
+    const enrollmentIds = enrollments.map((e: any) => e.id);
+    const enrollmentByCourseId = new Map(
+      enrollments.map((e: any) => [String(e.courseId), String(e.id)])
     );
 
-    // Unlock fallback: if a lesson was scheduled and 1 hour has passed since start time.
-    let lessonSchedules: {
-      enrollmentId: number;
-      lessonNumber: number;
-      scheduledAt: Date;
-    }[] = [];
+    let lessonCompletions: any[] = [];
     if (enrollmentIds.length > 0) {
-      lessonSchedules = await db
-        .selectFrom("lessonSchedules")
-        .select(["enrollmentId", "lessonNumber", "scheduledAt"])
-        .where("enrollmentId", "in", enrollmentIds)
-        .execute();
+      let { data, error } = await supabaseAdmin
+        .from("lessonCompletions")
+        .select("enrollmentId,lessonNumber")
+        .in("enrollmentId", enrollmentIds as any);
+      if (error && isSchemaError(error)) {
+        const snake = await supabaseAdmin
+          .from("lesson_completions")
+          .select("enrollment_id,lesson_number")
+          .in("enrollment_id", enrollmentIds as any);
+        if (!snake.error) {
+          data = (snake.data ?? []).map((r: any) => ({
+            enrollmentId: r.enrollment_id,
+            lessonNumber: r.lesson_number,
+          }));
+          error = null;
+        }
+      }
+      if (error) throw error;
+      lessonCompletions = data ?? [];
+    }
+
+    const completedLessonsSet = new Set(
+      lessonCompletions.map(
+        (lc: any) => `${String(lc.enrollmentId)}-${Number(lc.lessonNumber)}`
+      )
+    );
+
+    let lessonSchedules: any[] = [];
+    if (enrollmentIds.length > 0) {
+      let { data, error } = await supabaseAdmin
+        .from("lessonSchedules")
+        .select("enrollmentId,lessonNumber,scheduledAt")
+        .in("enrollmentId", enrollmentIds as any);
+      if (error && isSchemaError(error)) {
+        const snake = await supabaseAdmin
+          .from("lesson_schedules")
+          .select("enrollment_id,lesson_number,scheduled_at")
+          .in("enrollment_id", enrollmentIds as any);
+        if (!snake.error) {
+          data = (snake.data ?? []).map((r: any) => ({
+            enrollmentId: r.enrollment_id,
+            lessonNumber: r.lesson_number,
+            scheduledAt: r.scheduled_at,
+          }));
+          error = null;
+        }
+      }
+      if (error) throw error;
+      lessonSchedules = data ?? [];
     }
 
     const oneHourMs = 60 * 60 * 1000;
     const nowMs = Date.now();
     const unlockedByScheduleSet = new Set(
       lessonSchedules
-        .filter((ls) => new Date(ls.scheduledAt).getTime() + oneHourMs <= nowMs)
-        .map((ls) => `${ls.enrollmentId}-${ls.lessonNumber}`)
+        .filter(
+          (ls: any) =>
+            new Date(ls.scheduledAt).getTime() + oneHourMs <= nowMs
+        )
+        .map(
+          (ls: any) =>
+            `${String(ls.enrollmentId)}-${Number(ls.lessonNumber)}`
+        )
     );
 
-    const resultEbooks = ebooks.map((ebook) => {
+    const courseIds = Array.from(
+      new Set(
+        ebooks
+          .map((e: any) => readField(e, "courseId", "course_id"))
+          .filter((v) => v !== null && v !== undefined)
+      )
+    );
+    const courseNameMap = new Map<string, string>();
+    if (courseIds.length > 0) {
+      const { data, error } = await supabaseAdmin
+        .from("courses")
+        .select("id,name")
+        .in("id", courseIds as any);
+      if (!error) {
+        for (const c of data ?? []) {
+          courseNameMap.set(String(c.id), c.name);
+        }
+      }
+    }
+
+    const resultEbooks = ebooks.map((ebook: any) => {
+      const courseId = readField<number | string | null>(
+        ebook,
+        "courseId",
+        "course_id"
+      );
+      const sortOrder = Number(readField(ebook, "sortOrder", "sort_order") ?? 0);
       let isUnlocked = false;
 
-      // Unlock only when the corresponding lesson is marked complete.
-      // Also unlock 1 hour after scheduled lesson time from lessonSchedules.
-      // Supports both 0-based and 1-based sort ordering from sheet data.
-      const enrollmentId = ebook.courseId
-        ? enrollmentByCourseId.get(ebook.courseId)
-        : undefined;
-      if (enrollmentId) {
-        const keySame = `${enrollmentId}-${ebook.sortOrder}`;
-        const keyPlusOne = `${enrollmentId}-${ebook.sortOrder + 1}`;
-        isUnlocked =
-          completedLessonsSet.has(keySame) ||
-          completedLessonsSet.has(keyPlusOne) ||
-          unlockedByScheduleSet.has(keySame) ||
-          unlockedByScheduleSet.has(keyPlusOne);
+      if (courseId !== null && courseId !== undefined) {
+        const enrollmentId = enrollmentByCourseId.get(String(courseId));
+        if (enrollmentId) {
+          const keySame = `${enrollmentId}-${sortOrder}`;
+          const keyPlusOne = `${enrollmentId}-${sortOrder + 1}`;
+          isUnlocked =
+            completedLessonsSet.has(keySame) ||
+            completedLessonsSet.has(keyPlusOne) ||
+            unlockedByScheduleSet.has(keySame) ||
+            unlockedByScheduleSet.has(keyPlusOne);
+        }
       }
 
       return {
-        id: ebook.id,
-        title: ebook.title,
-        titleVi: ebook.titleVi,
-        description: ebook.description,
-        descriptionVi: ebook.descriptionVi,
-        coverImageUrl: ebook.coverImageUrl,
-        fileUrl: ebook.fileUrl,
-        courseId: ebook.courseId,
-        sortOrder: ebook.sortOrder,
-        courseName: ebook.courseName,
+        id: Number(readField(ebook, "id") ?? 0),
+        title: String(readField(ebook, "title") ?? ""),
+        titleVi: readField<string | null>(ebook, "titleVi", "title_vi") ?? null,
+        description:
+          readField<string | null>(ebook, "description") ?? null,
+        descriptionVi:
+          readField<string | null>(ebook, "descriptionVi", "description_vi") ??
+          null,
+        coverImageUrl:
+          readField<string | null>(ebook, "coverImageUrl", "cover_image_url") ??
+          null,
+        fileUrl: readField<string | null>(ebook, "fileUrl", "file_url") ?? null,
+        courseId: (courseId as any) ?? null,
+        sortOrder,
+        courseName:
+          courseId !== null && courseId !== undefined
+            ? courseNameMap.get(String(courseId)) ?? null
+            : null,
         isUnlocked,
       };
     });
@@ -167,10 +249,9 @@ export async function handle(request: Request) {
     );
   } catch (error) {
     console.error("Error listing ebooks:", error);
-    // Always return locked fallback ebooks so the page still renders even when
-    // database/schema configuration is incomplete in production.
     return new Response(
       superjson.stringify({ ebooks: fallbackEbooks } satisfies OutputType)
     );
   }
 }
+
