@@ -2,128 +2,7 @@ import { supabaseAdmin } from "../../helpers/supabaseServer";
 import superjson from "superjson";
 import { OutputType } from "./list_GET.schema";
 
-const csvFallbackCourses: OutputType["courses"] = [
-  {
-    id: 5,
-    name: "Khoá học DJ Cơ Bản",
-    description:
-      "Basic DJ Course - Learn the fundamentals of DJing including beatmatching, mixing basics, and equipment handling. Perfect for complete beginners.",
-    totalLessons: 8,
-    maxStudents: 10,
-    skillLevel: "Beginner",
-    price: "9600000.00",
-    isActive: true,
-    instructorId: 2,
-    instructorName: "DJ Phatbeatz",
-    instructorAvatar: null,
-    enrolledCount: 0,
-  },
-  {
-    id: 6,
-    name: "Khoá học DJ Trung Cấp",
-    description:
-      "Intermediate DJ Course - Build on your basics with advanced mixing techniques, EQ control, and set building.",
-    totalLessons: 10,
-    maxStudents: 10,
-    skillLevel: "Intermediate",
-    price: "12000000.00",
-    isActive: true,
-    instructorId: 2,
-    instructorName: "DJ Phatbeatz",
-    instructorAvatar: null,
-    enrolledCount: 0,
-  },
-  {
-    id: 7,
-    name: "Khoá học DJ Nâng Cao",
-    description:
-      "Advanced DJ Course - Master advanced techniques including scratching, harmonic mixing, and live performance skills.",
-    totalLessons: 12,
-    maxStudents: 10,
-    skillLevel: "Advanced",
-    price: "15000000.00",
-    isActive: true,
-    instructorId: 2,
-    instructorName: "DJ Phatbeatz",
-    instructorAvatar: null,
-    enrolledCount: 0,
-  },
-  {
-    id: 8,
-    name: "Khoá học DJ Cho Trẻ",
-    description:
-      "DJ Course for Kids - Fun and engaging DJ lessons designed specifically for young aspiring DJs aged 8-15.",
-    totalLessons: 6,
-    maxStudents: 10,
-    skillLevel: "Beginner",
-    price: "7200000.00",
-    isActive: true,
-    instructorId: 2,
-    instructorName: "DJ Phatbeatz",
-    instructorAvatar: null,
-    enrolledCount: 0,
-  },
-  {
-    id: 9,
-    name: "Khóa học DJ Toàn Diện",
-    description:
-      "Comprehensive DJ Course - Complete program covering all aspects from beginner to professional level.",
-    totalLessons: 16,
-    maxStudents: 10,
-    skillLevel: "All Levels",
-    price: "25000000.00",
-    isActive: true,
-    instructorId: 2,
-    instructorName: "DJ Phatbeatz",
-    instructorAvatar: null,
-    enrolledCount: 0,
-  },
-  {
-    id: 10,
-    name: "Khoá học DJ Chuyên Sâu HipHop",
-    description:
-      "Intensive HipHop DJ Course - Focus on HipHop music, scratching, beatjuggling, and turntablism.",
-    totalLessons: 8,
-    maxStudents: 10,
-    skillLevel: "Intermediate",
-    price: "12000000.00",
-    isActive: true,
-    instructorId: 2,
-    instructorName: "DJ Phatbeatz",
-    instructorAvatar: null,
-    enrolledCount: 0,
-  },
-  {
-    id: 11,
-    name: "Khoá học DJ Chuyên Sâu EDM",
-    description:
-      "Intensive EDM DJ Course - Master EDM mixing, effects, build-ups, drops, and festival-style performances.",
-    totalLessons: 8,
-    maxStudents: 10,
-    skillLevel: "Intermediate",
-    price: "12000000.00",
-    isActive: true,
-    instructorId: 2,
-    instructorName: "DJ Phatbeatz",
-    instructorAvatar: null,
-    enrolledCount: 0,
-  },
-  {
-    id: 12,
-    name: "Khoá học DJ Chuyên Sâu Techno",
-    description:
-      "Intensive Techno DJ Course - Deep dive into underground music, layering, cueing, and creating hypnotic sets.",
-    totalLessons: 8,
-    maxStudents: 10,
-    skillLevel: "Intermediate",
-    price: "12000000.00",
-    isActive: true,
-    instructorId: 2,
-    instructorName: "DJ Phatbeatz",
-    instructorAvatar: null,
-    enrolledCount: 0,
-  },
-];
+const csvFallbackCourses: OutputType["courses"] = [];
 
 function isMissingTableError(error: unknown, tableName: string): boolean {
   const maybeErr = error as { code?: string; message?: string } | null;
@@ -175,7 +54,7 @@ export async function handle(request: Request) {
     if (!courses || courses.length === 0) {
       return new Response(
         superjson.stringify({
-          courses: csvFallbackCourses,
+          courses: [],
         } satisfies OutputType)
       );
     }
