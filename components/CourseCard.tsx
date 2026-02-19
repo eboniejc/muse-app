@@ -3,7 +3,6 @@ import { CourseWithDetails } from "../endpoints/courses/list_GET.schema";
 import { useCourseEnrollments } from "../helpers/useCourseEnrollments";
 import { Button } from "./Button";
 import { Badge } from "./Badge";
-import { Progress } from "./Progress";
 import { Clock, Users, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -55,12 +54,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
       </div>
 
       {isEnrolled && enrollment ? (
-        <div className={styles.progressSection}>
-          <div className={styles.progressLabel}>
-            <span>Progress</span>
-            <span>{enrollment.progressPercentage || 0}%</span>
-          </div>
-          <Progress value={enrollment.progressPercentage || 0} />
+        <div className={styles.footer}>
+          <div className={styles.price}>Enrolled</div>
+          <Button onClick={() => navigate("/dashboard")} className={styles.enrollBtn} variant="secondary">
+            View Dashboard
+          </Button>
         </div>
       ) : (
         <div className={styles.footer}>

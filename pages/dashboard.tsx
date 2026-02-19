@@ -7,7 +7,7 @@ import { useUpcomingLessons } from "../helpers/useUpcomingLessons";
 import { useCourseEnrollments } from "../helpers/useCourseEnrollments";
 import { Button } from "../components/Button";
 import { Skeleton } from "../components/Skeleton";
-import { Calendar, Clock, GraduationCap, ArrowRight } from "lucide-react";
+import { Calendar, GraduationCap, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import styles from "./dashboard.module.css";
 
@@ -24,9 +24,6 @@ export default function DashboardPage() {
   const upcomingBookingsCount = lessons?.length || 0;
   const activeCoursesCount = enrollments?.filter(e => e.status === "active").length || 0;
   
-  // Mock practice hours (since we don't have historical data API easily available in this context)
-  const practiceHours = 12; 
-
   return (
     <div className={styles.container}>
       <Helmet>
@@ -58,15 +55,6 @@ export default function DashboardPage() {
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{activeCoursesCount}</span>
             <span className={styles.statLabel}>{t('dashboard.activeCourses')}</span>
-          </div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ color: "var(--accent)" }}>
-            <Clock size={24} />
-          </div>
-          <div className={styles.statInfo}>
-            <span className={styles.statValue}>{practiceHours}h</span>
-            <span className={styles.statLabel}>{t('dashboard.practiceTime')}</span>
           </div>
         </div>
       </div>
@@ -127,14 +115,11 @@ export default function DashboardPage() {
                 <div key={enrollment.id} className={styles.listItem}>
                   <div className={styles.itemDetails}>
                     <h3 className={styles.itemTitle}>{enrollment.courseName}</h3>
-                    <div className={styles.progressBar}>
-                      <div 
-                        className={styles.progressFill} 
-                        style={{ width: `${enrollment.progressPercentage || 0}%` }} 
-                      />
-                    </div>
+                    <p className={styles.itemSub}>
+                      Status: {enrollment.status}
+                    </p>
                   </div>
-                  <span className={styles.percentage}>{enrollment.progressPercentage || 0}%</span>
+                  <div className={styles.statusIndicator} data-status="confirmed" />
                 </div>
               ))
             ) : (
