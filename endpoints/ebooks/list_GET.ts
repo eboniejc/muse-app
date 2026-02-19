@@ -106,9 +106,6 @@ export async function handle(request: Request) {
     }
 
     const enrollmentIds = enrollments.map((e: any) => e.id);
-    const enrollmentByCourseId = new Map(
-      enrollments.map((e: any) => [String(e.courseId), String(e.id)])
-    );
 
     let lessonCompletions: any[] = [];
     if (enrollmentIds.length > 0) {
@@ -133,10 +130,8 @@ export async function handle(request: Request) {
       lessonCompletions = data ?? [];
     }
 
-    const completedLessonsSet = new Set(
-      lessonCompletions.map(
-        (lc: any) => `${String(lc.enrollmentId)}-${Number(lc.lessonNumber)}`
-      )
+    const completedLessonNumbers = new Set(
+      lessonCompletions.map((lc: any) => Number(lc.lessonNumber))
     );
 
     let lessonSchedules: any[] = [];
@@ -165,16 +160,13 @@ export async function handle(request: Request) {
 
     const oneHourMs = 60 * 60 * 1000;
     const nowMs = Date.now();
-    const unlockedByScheduleSet = new Set(
+    const unlockedByScheduleLessonNumbers = new Set(
       lessonSchedules
         .filter(
           (ls: any) =>
             new Date(ls.scheduledAt).getTime() + oneHourMs <= nowMs
         )
-        .map(
-          (ls: any) =>
-            `${String(ls.enrollmentId)}-${Number(ls.lessonNumber)}`
-        )
+        .map((ls: any) => Number(ls.lessonNumber))
     );
 
     const courseIds = Array.from(
@@ -206,18 +198,9 @@ export async function handle(request: Request) {
       const sortOrder = Number(readField(ebook, "sortOrder", "sort_order") ?? 0);
       let isUnlocked = false;
 
-      if (courseId !== null && courseId !== undefined) {
-        const enrollmentId = enrollmentByCourseId.get(String(courseId));
-        if (enrollmentId) {
-          const keySame = `${enrollmentId}-${sortOrder}`;
-          const keyPlusOne = `${enrollmentId}-${sortOrder + 1}`;
-          isUnlocked =
-            completedLessonsSet.has(keySame) ||
-            completedLessonsSet.has(keyPlusOne) ||
-            unlockedByScheduleSet.has(keySame) ||
-            unlockedByScheduleSet.has(keyPlusOne);
-        }
-      }
+      isUnlocked =
+        completedLessonNumbers.has(sortOrder) ||
+        unlockedByScheduleLessonNumbers.has(sortOrder);
 
       return {
         id: Number(readField(ebook, "id") ?? 0),
@@ -254,4 +237,3 @@ export async function handle(request: Request) {
     );
   }
 }
-
