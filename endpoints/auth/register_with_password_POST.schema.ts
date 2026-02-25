@@ -3,7 +3,13 @@ import { User } from "../../helpers/User";
 
 export const schema = z.object({
   email: z.string().email("Email is required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z
+    .string()
+    .min(12, "Password must be at least 12 characters")
+    .regex(/[a-z]/, "Password must include a lowercase letter")
+    .regex(/[A-Z]/, "Password must include an uppercase letter")
+    .regex(/[0-9]/, "Password must include a number")
+    .regex(/[^A-Za-z0-9]/, "Password must include a special character"),
   displayName: z.string().min(1, "Name is required"),
 });
 

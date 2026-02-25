@@ -7,11 +7,16 @@ import {
   SessionExpirationSeconds,
 } from "../../helpers/getSetServerSession";
 import { generatePasswordHash } from "../../helpers/generatePasswordHash";
+import { validatePasswordPolicy } from "../../helpers/validatePasswordPolicy";
 
 export async function handle(request: Request) {
   try {
     const json = await request.json();
     const { email, password, displayName } = schema.parse(json);
+    const policyError = validatePasswordPolicy(password, { email, displayName });
+    if (policyError) {
+      return Response.json({ message: policyError }, { status: 400 });
+    }
 
     // Check if email already exists
     const { data: existingUser, error: existingErr } = await supabaseAdmin
