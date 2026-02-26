@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { RegistrationForm } from "../components/RegistrationForm";
 import { Button } from "../components/Button";
+import { BrandMark } from "../components/BrandMark";
 import styles from "./complete-registration.module.css";
 
 export default function CompleteRegistrationPage() {
@@ -15,7 +16,7 @@ export default function CompleteRegistrationPage() {
 
       <header className={styles.header}>
         <div className={styles.logoContainer}>
-          <span className={styles.logoText}>MUSE INC</span>
+          <BrandMark size="md" />
         </div>
       </header>
 
@@ -24,7 +25,8 @@ export default function CompleteRegistrationPage() {
           <div className={styles.intro}>
             <h1 className={styles.title}>Complete Your Registration</h1>
             <p className={styles.subtitle}>
-              Please fill in your details to start your DJ journey with MUSE Inc.
+              Please fill in your details to start your DJ journey with{" "}
+              <span className={styles.inlineBrand}><BrandMark size="sm" /></span>.
             </p>
           </div>
 

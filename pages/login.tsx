@@ -7,6 +7,7 @@ import { PasswordLoginForm } from "../components/PasswordLoginForm";
 import { PasswordRegisterForm } from "../components/PasswordRegisterForm";
 import { OAuthButtonGroup } from "../components/OAuthButtonGroup";
 import { LanguageToggle } from "../components/LanguageToggle";
+import { BrandMark } from "../components/BrandMark";
 import { useAuth } from "../helpers/useAuth";
 import styles from "./login.module.css";
 
@@ -36,7 +37,9 @@ export default function LoginPage() {
           <LanguageToggle />
         </div>
         <div className={styles.header}>
-          <div className={styles.logo}>MUSE INC</div>
+          <div className={styles.logo}>
+            <BrandMark size="lg" />
+          </div>
           <h1 className={styles.title}>{t("auth.loginTitle")}</h1>
           <p className={styles.subtitle}>{t("auth.loginSubtitle")}</p>
         </div>

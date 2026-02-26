@@ -4,7 +4,7 @@ import styles from "./BrandMark.module.css";
 type BrandMarkProps = {
   className?: string;
   showText?: boolean;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 };
 
 export const BrandMark: React.FC<BrandMarkProps> = ({

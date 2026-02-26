@@ -5,6 +5,7 @@ import { Button } from "./Button";
 import { UserDropdown } from "./UserDropdown";
 import { Sheet, SheetContent, SheetTrigger } from "./Sheet";
 import { LanguageToggle } from "./LanguageToggle";
+import { BrandMark } from "./BrandMark";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../helpers/useAuth";
 import styles from "./DashboardLayout.module.css";
@@ -36,7 +37,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       {/* Desktop Sidebar */}
       <aside className={styles.sidebar}>
         <div className={styles.logoContainer}>
-          <span className={styles.logoText}>MUSE INC</span>
+          <BrandMark size="md" />
         </div>
         <nav className={styles.nav}>
           {navItems.map((item) => {
@@ -67,7 +68,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
               </SheetTrigger>
               <SheetContent side="left" className={styles.mobileSheet}>
                 <div className={styles.logoContainer}>
-                  <span className={styles.logoText}>MUSE INC</span>
+                  <BrandMark size="md" />
                 </div>
                 <nav className={styles.mobileNav}>
                   {navItems.map((item) => {

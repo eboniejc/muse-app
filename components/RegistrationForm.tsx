@@ -74,21 +74,49 @@ export const RegistrationForm = () => {
     try {
       await updateProfile(values);
 
+      const selectedCourse = hasSelectedCourse
+        ? courses?.find((c) => c.id === selectedCourseId)
+        : null;
+
       if (hasSelectedCourse) {
         await enrollCourseMutation.mutateAsync({ courseId: selectedCourseId });
+      }
 
-        const selectedCourse = courses?.find((c) => c.id === selectedCourseId);
-        const studentName =
-          values.fullName ||
-          profile?.fullName ||
-          profile?.displayName ||
-          "A student";
-        const courseName = selectedCourse?.name || `Course #${selectedCourseId}`;
-        const whatsappMessage = encodeURIComponent(
-          `New enrollment: ${studentName} enrolled in ${courseName}.`
-        );
-        const whatsappUrl = `https://wa.me/16302904094?text=${whatsappMessage}`;
-        (window.top || window).open(whatsappUrl, "_blank");
+      const notifyResult = await fetch("/_api/registration/notify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName:
+            values.fullName ||
+            profile?.fullName ||
+            profile?.displayName ||
+            "A student",
+          gender: values.gender || null,
+          address: values.address || null,
+          phoneNumber: values.phoneNumber,
+          dateOfBirth: values.dateOfBirth
+            ? format(values.dateOfBirth, "yyyy-MM-dd")
+            : null,
+          preferredPaymentMethod: values.preferredPaymentMethod || null,
+          bankAccountName: values.bankAccountName || null,
+          bankAccountNumber: values.bankAccountNumber || null,
+          bankName: values.bankName || null,
+          selectedCourseId: hasSelectedCourse ? selectedCourseId : null,
+          courseName: hasSelectedCourse
+            ? selectedCourse?.name || `Course #${selectedCourseId}`
+            : null,
+        }),
+      });
+
+      if (!notifyResult.ok) {
+        let message = "Failed to send registration email";
+        try {
+          const payload = (await notifyResult.json()) as { error?: string };
+          if (payload?.error) message = payload.error;
+        } catch {}
+        throw new Error(message);
       }
 
       navigate("/dashboard");

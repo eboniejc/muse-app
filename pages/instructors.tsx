@@ -5,6 +5,7 @@ import { MapPin, Phone, Mail } from "lucide-react";
 import { useInstructors } from "../helpers/useInstructors";
 import { InstructorCard } from "../components/InstructorCard";
 import { Skeleton } from "../components/Skeleton";
+import { BrandMark } from "../components/BrandMark";
 import { Instructor } from "../endpoints/instructors/list_GET.schema";
 import styles from "./instructors.module.css";
 
@@ -107,7 +108,9 @@ export default function InstructorsPage() {
 
       <footer className={styles.footer}>
         <div className={styles.contactInfo}>
-          <h3 className={styles.contactTitle}>MUSE Inc.</h3>
+          <div className={styles.contactTitle}>
+            <BrandMark size="md" />
+          </div>
           <div className={styles.contactItem}>
             <MapPin size={18} className={styles.icon} />
             <span>409 Hai Bà Trưng, Phường Xuân Hoà, TP Ho Chi Minh City, Vietnam</span>

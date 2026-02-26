@@ -60,6 +60,12 @@
   font-size: 1.125rem;
 }
 
+.inlineBrand {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: 0 var(--spacing-1);
+}
+
 .footer {
   display: flex;
   justify-content: center;
