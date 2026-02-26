@@ -84,6 +84,8 @@ const TABLE_COLUMNS: Record<string, Set<string>> = {
     "startAt",
     "endAt",
     "isActive",
+    "notification1hId",
+    "notification24hId",
   ]),
   users: new Set([
     "id",
@@ -126,6 +128,26 @@ function normalizeLessonScheduleRow(row: Record<string, any>) {
     enrollmentId: row.enrollmentId ?? row.enrollment_id ?? null,
     lessonNumber: row.lessonNumber ?? row.lesson_number ?? null,
     scheduledAt: row.scheduledAt ?? row.scheduled_at ?? null,
+    notification1hId: row.notification1hId ?? row.notification_1h_id ?? null,
+    notification24hId: row.notification24hId ?? row.notification_24h_id ?? null,
+  };
+}
+
+function normalizeEventRow(row: Record<string, any>) {
+  const isActiveRaw = row.isActive ?? row.is_active;
+  const isActive =
+    typeof isActiveRaw === "string"
+      ? isActiveRaw.toLowerCase() === "true"
+      : isActiveRaw ?? true;
+
+  return {
+    id: row.id ?? null,
+    title: row.title ?? null,
+    caption: row.caption ?? null,
+    flyerUrl: row.flyerUrl ?? row.flyer_url ?? null,
+    startAt: row.startAt ?? row.start_at ?? null,
+    endAt: row.endAt ?? row.end_at ?? null,
+    isActive,
     notification1hId: row.notification1hId ?? row.notification_1h_id ?? null,
     notification24hId: row.notification24hId ?? row.notification_24h_id ?? null,
   };
@@ -211,6 +233,8 @@ export async function handle(request: Request) {
       processedCount = await handleFlattenedEnrollmentsImport(rows);
     } else if (table === "lessonSchedules") {
       processedCount = await handleLessonSchedulesImport(rows);
+    } else if (table === "events") {
+      processedCount = await handleEventsImport(rows);
     } else {
       for (const rawRow of rows) {
         const row = pickAllowed(table, rawRow as Record<string, any>);
@@ -589,6 +613,114 @@ async function handleLessonSchedulesImport(rows: any[]) {
       if (error) throw error;
     } else {
       const { error } = await supabaseAdmin.from(scheduleTable).insert(scheduleData);
+      if (error) throw error;
+    }
+
+    count++;
+  }
+
+  return count;
+}
+
+async function handleEventsImport(rows: any[]) {
+  let count = 0;
+
+  for (const raw of rows) {
+    const row = normalizeEventRow(raw ?? {});
+    if (!row.title || !row.startAt) continue;
+
+    const startDate = new Date(row.startAt);
+    if (Number.isNaN(startDate.getTime())) continue;
+    const endDate = row.endAt ? new Date(row.endAt) : null;
+    if (endDate && Number.isNaN(endDate.getTime())) continue;
+
+    let existingEvent: any = null;
+    if (row.id) {
+      const { data, error } = await supabaseAdmin
+        .from("events")
+        .select("*")
+        .eq("id", row.id)
+        .limit(1)
+        .maybeSingle();
+      if (error && error.code !== "PGRST116") throw error;
+      existingEvent = data;
+    }
+
+    const existingStart = existingEvent?.startAt
+      ? new Date(existingEvent.startAt).getTime()
+      : null;
+    const timeChanged = existingStart == null || existingStart !== startDate.getTime();
+
+    const eventData: Record<string, any> = {
+      title: row.title,
+      caption: row.caption ?? null,
+      flyerUrl: row.flyerUrl ?? null,
+      startAt: startDate.toISOString(),
+      endAt: endDate ? endDate.toISOString() : null,
+      isActive: row.isActive !== false,
+      notification1hId:
+        existingEvent?.notification1hId ?? row.notification1hId ?? null,
+      notification24hId:
+        existingEvent?.notification24hId ?? row.notification24hId ?? null,
+    };
+
+    const shouldResetNotifications = timeChanged || eventData.isActive === false;
+    if (shouldResetNotifications) {
+      const old1h = existingEvent?.notification1hId;
+      const old24h = existingEvent?.notification24hId;
+      if (old1h) await cancelNotification(old1h);
+      if (old24h) await cancelNotification(old24h);
+      eventData.notification1hId = null;
+      eventData.notification24hId = null;
+    }
+
+    if (eventData.isActive && timeChanged) {
+      const now = new Date();
+      const time24h = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
+      const time1h = new Date(startDate.getTime() - 60 * 60 * 1000);
+
+      if (time24h > now) {
+        const id24h = await sendPushNotification({
+          headings: { en: "Event Tomorrow!", vi: "Sự kiện ngày mai!" },
+          contents: {
+            en: `${row.title} starts tomorrow at ${startDate.toLocaleTimeString(
+              "en-US",
+              { hour: "2-digit", minute: "2-digit", hour12: false }
+            )}`,
+            vi: `${row.title} bắt đầu vào ngày mai lúc ${startDate.toLocaleTimeString(
+              "vi-VN",
+              { hour: "2-digit", minute: "2-digit", hour12: false }
+            )}`,
+          },
+          segments: ["All"],
+          send_after: time24h,
+        });
+        if (id24h) eventData.notification24hId = id24h;
+      }
+
+      if (time1h > now) {
+        const id1h = await sendPushNotification({
+          headings: { en: "Event in 1 Hour!", vi: "Sự kiện trong 1 giờ nữa!" },
+          contents: {
+            en: `${row.title} starts in 1 hour.`,
+            vi: `${row.title} sẽ bắt đầu trong 1 giờ nữa.`,
+          },
+          segments: ["All"],
+          send_after: time1h,
+        });
+        if (id1h) eventData.notification1hId = id1h;
+      }
+    }
+
+    if (existingEvent?.id) {
+      const { error } = await supabaseAdmin
+        .from("events")
+        .update(eventData)
+        .eq("id", existingEvent.id);
+      if (error) throw error;
+    } else {
+      const insertData = row.id ? { ...eventData, id: row.id } : eventData;
+      const { error } = await supabaseAdmin.from("events").insert(insertData);
       if (error) throw error;
     }
 

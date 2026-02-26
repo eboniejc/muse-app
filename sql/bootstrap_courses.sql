@@ -52,9 +52,17 @@ create table if not exists public.events (
   "startAt" timestamptz not null,
   "endAt" timestamptz,
   "isActive" boolean not null default true,
+  "notification1hId" text,
+  "notification24hId" text,
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now()
 );
+
+alter table public.events
+  add column if not exists "notification1hId" text;
+
+alter table public.events
+  add column if not exists "notification24hId" text;
 
 create index if not exists idx_events_start_at
   on public.events ("startAt");
