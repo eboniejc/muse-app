@@ -18,20 +18,14 @@
 .logoContainer {
   display: flex;
   align-items: center;
-  gap: var(--spacing-3);
-}
-
-.logoIcon {
-  color: var(--primary);
-  width: 24px;
-  height: 24px;
 }
 
 .logoText {
   font-family: var(--font-family-heading);
   font-weight: 700;
-  font-size: 1.25rem;
-  letter-spacing: -0.02em;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
 }
 
 .main {

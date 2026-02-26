@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Calendar, GraduationCap, Menu, Music2, BookOpen, Users, Shield } from "lucide-react";
+import { LayoutDashboard, Calendar, GraduationCap, Menu, BookOpen, Users, Shield } from "lucide-react";
 import { Button } from "./Button";
 import { UserDropdown } from "./UserDropdown";
 import { Sheet, SheetContent, SheetTrigger } from "./Sheet";
@@ -36,7 +36,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       {/* Desktop Sidebar */}
       <aside className={styles.sidebar}>
         <div className={styles.logoContainer}>
-          <Music2 className={styles.logoIcon} />
           <span className={styles.logoText}>MUSE INC</span>
         </div>
         <nav className={styles.nav}>
@@ -68,7 +67,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
               </SheetTrigger>
               <SheetContent side="left" className={styles.mobileSheet}>
                 <div className={styles.logoContainer}>
-                  <Music2 className={styles.logoIcon} />
                   <span className={styles.logoText}>MUSE INC</span>
                 </div>
                 <nav className={styles.mobileNav}>

@@ -74,7 +74,7 @@ export async function handle(request: Request) {
       countMap.set(e.courseId, (countMap.get(e.courseId) || 0) + 1);
     });
 
-    const resultCourses = (courses || []).map((course: any) => ({
+    const mappedCourses = (courses || []).map((course: any) => ({
       id: course.id,
       name: course.name,
       description: course.description,
@@ -88,6 +88,28 @@ export async function handle(request: Request) {
       instructorAvatar: course.users?.avatarUrl || course.users?.avatarurl || null,
       enrolledCount: countMap.get(course.id) || 0,
     }));
+
+    // Defensive dedupe: if duplicate active rows exist for the same course name,
+    // keep a single canonical row in API output.
+    const dedupedByName = new Map<string, (typeof mappedCourses)[number]>();
+    for (const course of mappedCourses) {
+      const key = String(course.name ?? "").trim().toLowerCase();
+      const existing = dedupedByName.get(key);
+      if (!existing) {
+        dedupedByName.set(key, course);
+        continue;
+      }
+
+      const preferCurrent =
+        (course.enrolledCount ?? 0) > (existing.enrolledCount ?? 0) ||
+        ((course.enrolledCount ?? 0) === (existing.enrolledCount ?? 0) &&
+          Number(course.id) < Number(existing.id));
+
+      if (preferCurrent) {
+        dedupedByName.set(key, course);
+      }
+    }
+    const resultCourses = Array.from(dedupedByName.values());
 
     return new Response(
       superjson.stringify({

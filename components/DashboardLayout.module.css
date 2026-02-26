@@ -23,21 +23,15 @@
   display: flex;
   align-items: center;
   padding: 0 var(--spacing-6);
-  gap: var(--spacing-3);
   border-bottom: 1px solid var(--border);
-}
-
-.logoIcon {
-  color: var(--primary);
-  width: 24px;
-  height: 24px;
 }
 
 .logoText {
   font-family: var(--font-family-heading);
   font-weight: 700;
-  font-size: 1.25rem;
-  letter-spacing: -0.02em;
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
 }
 
 .nav {

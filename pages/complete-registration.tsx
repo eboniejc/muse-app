@@ -1,7 +1,7 @@
 import React from "react";
 import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
-import { Music2, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { RegistrationForm } from "../components/RegistrationForm";
 import { Button } from "../components/Button";
 import styles from "./complete-registration.module.css";
@@ -15,7 +15,6 @@ export default function CompleteRegistrationPage() {
 
       <header className={styles.header}>
         <div className={styles.logoContainer}>
-          <Music2 className={styles.logoIcon} />
           <span className={styles.logoText}>MUSE INC</span>
         </div>
       </header>

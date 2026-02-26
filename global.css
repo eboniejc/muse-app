@@ -49,49 +49,45 @@
 }
 
 :root {
-  /* Dark Mode Only Design - Defaulting root to dark values */
-  
-  /* Backgrounds - Deep, matte, industrial darks - Neutralized for Orange pop */
-  --background: hsl(0 0% 5%); /* Pure dark, removed blue tint */
-  --foreground: hsl(0 0% 95%); /* Off-white for text */
+  /* Brand foundation (MUSE INC) */
+  --background: hsl(0 0% 4%);
+  --foreground: hsl(0 0% 98%);
 
   /* Surfaces - Slightly elevated, mimicking hardware casing */
-  --surface: hsl(0 0% 9%); 
-  --surface-foreground: hsl(0 0% 90%);
+  --surface: hsl(220 7% 12%);
+  --surface-foreground: hsl(0 0% 93%);
   
-  --sidebar: hsl(0 0% 7%);
-  --sidebar-foreground: hsl(0 0% 80%);
+  --sidebar: hsl(220 9% 10%);
+  --sidebar-foreground: hsl(0 0% 90%);
   
-  --card: hsl(0 0% 11%);
-  --card-foreground: hsl(0 0% 95%);
+  --card: hsl(220 8% 11%);
+  --card-foreground: hsl(0 0% 96%);
   
-  --popup: hsl(0 0% 13%);
+  --popup: hsl(220 8% 14%);
   --popup-foreground: hsl(0 0% 98%);
 
-  /* Primary - MUSE Orange (Vibrant, Energetic) */
-  --primary: hsl(25 100% 50%); /* #FF6B00 equivalent */
+  /* Brand colors from guide */
+  --primary: hsl(220 100% 30%); /* #003399 */
   --primary-foreground: hsl(0 0% 100%);
 
-  /* Secondary - Industrial White/Silver (High Contrast Signals) */
-  --secondary: hsl(0 0% 90%);
-  --secondary-foreground: hsl(0 0% 5%);
+  --secondary: hsl(40 100% 50%); /* #ffa800 */
+  --secondary-foreground: hsl(0 0% 8%);
 
-  /* Accent - Recording Red (Alerts/Urgent/Recording) */
-  --accent: hsl(0 80% 60%);
+  --accent: hsl(0 100% 50%); /* #ff0000 */
   --accent-foreground: hsl(0 0% 100%);
 
   /* Muted - For inactive states/faders */
-  --muted: hsl(0 0% 20%);
-  --muted-foreground: hsl(0 0% 50%);
+  --muted: hsl(220 6% 20%);
+  --muted-foreground: hsl(0 0% 67%);
 
   /* Functional Colors */
   --success: hsl(150 70% 45%);
   --success-foreground: hsl(0 0% 100%);
   
-  --error: hsl(0 70% 50%);
+  --error: hsl(0 100% 50%);
   --error-foreground: hsl(0 0% 100%);
   
-  --warning: hsl(40 90% 50%);
+  --warning: hsl(40 100% 50%);
   --warning-foreground: hsl(0 0% 5%);
   
   --info: hsl(200 80% 50%);
@@ -100,7 +96,7 @@
   --info-active: hsl(200 80% 40%);
 
   /* Borders - Subtle, technical, neutral */
-  --border: hsl(0 0% 20%);
+  --border: hsl(220 5% 25%);
 
   /* Font Families */
   --font-family-base: 'Manrope', sans-serif;
@@ -126,12 +122,11 @@
   --animation-duration-normal: 200ms;
   --animation-duration-slow: 350ms;
 
-  /* Chart Colors - MUSE Palette */
-  --chart-color-1: hsl(25 100% 50%);  /* Orange */
-  --chart-color-2: hsl(0 0% 90%);     /* White */
-  --chart-color-3: hsl(0 80% 60%);    /* Red */
-  --chart-color-4: hsl(45 90% 50%);   /* Gold */
-  --chart-color-5: hsl(200 80% 50%);  /* Blue (Complementary) */
+  --chart-color-1: hsl(220 100% 30%); /* #003399 */
+  --chart-color-2: hsl(40 100% 50%);  /* #ffa800 */
+  --chart-color-3: hsl(0 100% 50%);   /* #ff0000 */
+  --chart-color-4: hsl(0 0% 100%);
+  --chart-color-5: hsl(220 6% 32%);
   
   /* Special Effects */
   --glass-panel: hsl(0 0% 12% / 0.7);

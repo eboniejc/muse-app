@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Music2, Facebook, Youtube, Instagram, MessageCircle } from "lucide-react";
+import { Facebook, Youtube, Instagram, MessageCircle } from "lucide-react";
 import { LanguageToggle } from "./LanguageToggle";
 import styles from "./LandingFooter.module.css";
 
@@ -12,7 +12,6 @@ export const LandingFooter = () => {
       <div className={styles.container}>
         <div className={styles.column}>
           <div className={styles.brand}>
-            <Music2 className={styles.icon} />
             <span className={styles.name}>MUSE INC</span>
           </div>
           <p className={styles.description}>
