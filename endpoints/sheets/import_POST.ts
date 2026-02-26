@@ -76,6 +76,15 @@ const TABLE_COLUMNS: Record<string, Set<string>> = {
     "notification1hId",
     "notification24hId",
   ]),
+  events: new Set([
+    "id",
+    "title",
+    "caption",
+    "flyerUrl",
+    "startAt",
+    "endAt",
+    "isActive",
+  ]),
   users: new Set([
     "id",
     "email",

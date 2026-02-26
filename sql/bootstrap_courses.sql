@@ -44,3 +44,20 @@ create index if not exists idx_course_enrollments_course_id
 create index if not exists idx_course_enrollments_user_id
   on public."courseEnrollments" ("userId");
 
+create table if not exists public.events (
+  id bigserial primary key,
+  title text not null,
+  caption text,
+  "flyerUrl" text,
+  "startAt" timestamptz not null,
+  "endAt" timestamptz,
+  "isActive" boolean not null default true,
+  "createdAt" timestamptz not null default now(),
+  "updatedAt" timestamptz not null default now()
+);
+
+create index if not exists idx_events_start_at
+  on public.events ("startAt");
+
+create index if not exists idx_events_is_active
+  on public.events ("isActive");

@@ -4,10 +4,11 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../helpers/useAuth";
 import { useUpcomingLessons } from "../helpers/useUpcomingLessons";
+import { useUpcomingEvents } from "../helpers/useUpcomingEvents";
 import { useCourseEnrollments } from "../helpers/useCourseEnrollments";
 import { Button } from "../components/Button";
 import { Skeleton } from "../components/Skeleton";
-import { Calendar, GraduationCap, ArrowRight } from "lucide-react";
+import { Calendar, GraduationCap, ArrowRight, PartyPopper } from "lucide-react";
 import { format } from "date-fns";
 import styles from "./dashboard.module.css";
 
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const user = authState.type === "authenticated" ? authState.user : null;
   
   const { data: lessons, isLoading: lessonsLoading } = useUpcomingLessons();
+  const { data: events, isLoading: eventsLoading } = useUpcomingEvents();
   
   const { data: enrollments, isLoading: enrollmentsLoading } = useCourseEnrollments();
 
@@ -125,6 +127,45 @@ export default function DashboardPage() {
             ) : (
               <div className={styles.emptyState}>
                 <p>{t('dashboard.noCourses')}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Upcoming Events */}
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>{t("dashboard.upcomingEvents")}</h2>
+          </div>
+
+          <div className={styles.list}>
+            {eventsLoading ? (
+              <Skeleton className="h-20 w-full" />
+            ) : events && events.length > 0 ? (
+              events.slice(0, 3).map((event) => (
+                <div key={event.id} className={styles.listItem}>
+                  <div className={styles.dateBox}>
+                    <span className={styles.day}>{format(new Date(event.startAt), "dd")}</span>
+                    <span className={styles.month}>{format(new Date(event.startAt), "MMM")}</span>
+                  </div>
+                  <div className={styles.itemDetails}>
+                    <h3 className={styles.itemTitle}>{event.title}</h3>
+                    <p className={styles.itemSub}>
+                      {format(new Date(event.startAt), "h:mm a")}
+                      {event.endAt
+                        ? ` - ${format(new Date(event.endAt), "h:mm a")}`
+                        : ""}
+                    </p>
+                    {event.caption ? (
+                      <p className={styles.eventCaption}>{event.caption}</p>
+                    ) : null}
+                  </div>
+                  <PartyPopper size={16} className={styles.eventIcon} />
+                </div>
+              ))
+            ) : (
+              <div className={styles.emptyState}>
+                <p>{t("dashboard.noEvents")}</p>
               </div>
             )}
           </div>

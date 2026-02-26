@@ -112,6 +112,18 @@ async function safeSelectUserProfiles() {
   return data ?? [];
 }
 
+async function safeSelectEvents() {
+  const rows = await safeSelectAll("events");
+  if (rows.length > 0) return rows;
+
+  const { data, error } = await supabaseAdmin.from("events").select("*");
+  if (error) {
+    console.error("Sheets export: failed Supabase query for events:", error);
+    return [];
+  }
+  return data ?? [];
+}
+
 function readField<T = unknown>(row: Record<string, any>, ...keys: string[]): T | undefined {
   for (const key of keys) {
     if (row[key] !== undefined) return row[key] as T;
@@ -225,6 +237,7 @@ export async function handle(request: Request) {
       courseEnrollments,
       lessonCompletions,
       lessonSchedules,
+      events,
       users,
       userProfiles,
     ] = await Promise.all([
@@ -235,6 +248,7 @@ export async function handle(request: Request) {
       safeSelectCourseEnrollments(),
       safeSelectAll("lessonCompletions"),
       safeSelectLessonSchedules(),
+      safeSelectEvents(),
       safeSelectUsers(),
       safeSelectUserProfiles(),
     ]);
@@ -279,6 +293,7 @@ export async function handle(request: Request) {
         };
       }),
       lessonCompletions,
+      events,
       lessonSchedules: (() => {
         const existing = Array.isArray(lessonSchedules) ? lessonSchedules : [];
         const existingKeySet = new Set(

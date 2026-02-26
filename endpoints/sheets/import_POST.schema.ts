@@ -12,6 +12,7 @@ export const schema = z.object({
     "courseEnrollments",
     "lessonCompletions",
     "lessonSchedules",
+    "events",
     "users",
     "userProfiles",
     "flattenedEnrollments",

@@ -1,11 +1,12 @@
 import { schema } from "./script_GET.schema";
 
 const GOOGLE_APPS_SCRIPT_CONTENT = `/**
- * MUSE INC Sheets Sync (Flattened)
- * One sheet: MasterEnrollments
+ * MUSE INC Sheets Sync
+ * Sheets: MasterEnrollments + Events
  */
 
 const MASTER_SHEET = "MasterEnrollments";
+const EVENTS_SHEET = "Events";
 const MAX_LESSONS = 16;
 
 function onOpen() {
@@ -13,8 +14,8 @@ function onOpen() {
     .createMenu("MUSE INC Sync")
     .addItem("Setup", "setup")
     .addSeparator()
-    .addItem("Pull Flattened Rows", "pullFromApp")
-    .addItem("Push Flattened Rows", "pushToApp")
+    .addItem("Pull From App", "pullFromApp")
+    .addItem("Push To App", "pushToApp")
     .addToUi();
 }
 
@@ -68,25 +69,13 @@ function pullFromApp() {
     }
 
     const parsed = parseSuperJSON(response.getContentText());
-    const rows = parsed?.data?.flattenedEnrollments || [];
+    const enrollmentRows = parsed?.data?.flattenedEnrollments || [];
+    const eventsRows = parsed?.data?.events || [];
 
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(MASTER_SHEET);
-    if (!sheet) sheet = ss.insertSheet(MASTER_SHEET);
+    writeSheetRows(MASTER_SHEET, buildEnrollmentHeaders(), enrollmentRows);
+    writeSheetRows(EVENTS_SHEET, buildEventHeaders(), eventsRows);
 
-    const headers = buildHeaders();
-    const values = [headers];
-
-    rows.forEach((row) => {
-      values.push(headers.map((h) => normalizeCell(row[h])));
-    });
-
-    sheet.clear();
-    sheet.getRange(1, 1, values.length || 1, headers.length).setValues(values.length ? values : [headers]);
-    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
-    sheet.autoResizeColumns(1, headers.length);
-
-    ui.alert(\`Pull complete: \${rows.length} row(s)\`);
+    ui.alert(\`Pull complete: \${enrollmentRows.length} enrollment row(s), \${eventsRows.length} event row(s)\`);
   } catch (error) {
     ui.alert(\`Pull failed: \${error.message}\`);
   }
@@ -104,53 +93,40 @@ function pushToApp() {
   }
 
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(MASTER_SHEET);
-    if (!sheet) throw new Error(\`Missing sheet: \${MASTER_SHEET}\`);
+    const enrollmentRows = readSheetRows(MASTER_SHEET);
+    const eventsRows = readSheetRows(EVENTS_SHEET, true);
 
-    const data = sheet.getDataRange().getValues();
-    if (data.length < 2) {
-      ui.alert("No rows to push.");
-      return;
-    }
-
-    const headers = data[0].map(String);
-    const rows = [];
-
-    for (let i = 1; i < data.length; i++) {
-      const obj = {};
-      let hasData = false;
-      for (let c = 0; c < headers.length; c++) {
-        const key = headers[c];
-        if (!key) continue;
-        let value = data[i][c];
-        if (value instanceof Date) value = value.toISOString();
-        if (value === "") value = null;
-        obj[key] = value;
-        if (value !== null && value !== undefined) hasData = true;
-      }
-      if (hasData) rows.push(obj);
-    }
-
-    const payload = { json: { table: "flattenedEnrollments", rows } };
-    const response = UrlFetchApp.fetch(\`\${appUrl}/_api/sheets/import\`, {
+    const enrollmentPayload = { json: { table: "flattenedEnrollments", rows: enrollmentRows } };
+    const enrollmentsResponse = UrlFetchApp.fetch(\`\${appUrl}/_api/sheets/import\`, {
       method: "post",
       headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
-      payload: JSON.stringify(payload),
+      payload: JSON.stringify(enrollmentPayload),
       muteHttpExceptions: true,
     });
 
-    if (response.getResponseCode() !== 200) {
-      throw new Error(\`Import failed \${response.getResponseCode()}: \${response.getContentText()}\`);
+    if (enrollmentsResponse.getResponseCode() !== 200) {
+      throw new Error(\`Enrollments import failed \${enrollmentsResponse.getResponseCode()}: \${enrollmentsResponse.getContentText()}\`);
     }
 
-    ui.alert(\`Push complete: \${rows.length} row(s)\`);
+    const eventsPayload = { json: { table: "events", rows: eventsRows } };
+    const eventsResponse = UrlFetchApp.fetch(\`\${appUrl}/_api/sheets/import\`, {
+      method: "post",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      payload: JSON.stringify(eventsPayload),
+      muteHttpExceptions: true,
+    });
+
+    if (eventsResponse.getResponseCode() !== 200) {
+      throw new Error(\`Events import failed \${eventsResponse.getResponseCode()}: \${eventsResponse.getContentText()}\`);
+    }
+
+    ui.alert(\`Push complete: \${enrollmentRows.length} enrollment row(s), \${eventsRows.length} event row(s)\`);
   } catch (error) {
     ui.alert(\`Push failed: \${error.message}\`);
   }
 }
 
-function buildHeaders() {
+function buildEnrollmentHeaders() {
   const headers = [
     "enrollmentId",
     "userId",
@@ -170,6 +146,58 @@ function buildHeaders() {
   }
 
   return headers;
+}
+
+function buildEventHeaders() {
+  return ["id", "title", "caption", "flyerUrl", "startAt", "endAt", "isActive"];
+}
+
+function writeSheetRows(sheetName, headers, rows) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) sheet = ss.insertSheet(sheetName);
+
+  const values = [headers];
+  rows.forEach((row) => {
+    values.push(headers.map((h) => normalizeCell(row[h])));
+  });
+
+  sheet.clear();
+  sheet.getRange(1, 1, values.length || 1, headers.length).setValues(values.length ? values : [headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+function readSheetRows(sheetName, allowMissing) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    if (allowMissing) return [];
+    throw new Error(\`Missing sheet: \${sheetName}\`);
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return [];
+
+  const headers = data[0].map(String);
+  const rows = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const obj = {};
+    let hasData = false;
+    for (let c = 0; c < headers.length; c++) {
+      const key = headers[c];
+      if (!key) continue;
+      let value = data[i][c];
+      if (value instanceof Date) value = value.toISOString();
+      if (value === "") value = null;
+      obj[key] = value;
+      if (value !== null && value !== undefined) hasData = true;
+    }
+    if (hasData) rows.push(obj);
+  }
+
+  return rows;
 }
 
 function normalizeCell(value) {
