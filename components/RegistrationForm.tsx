@@ -82,41 +82,45 @@ export const RegistrationForm = () => {
         await enrollCourseMutation.mutateAsync({ courseId: selectedCourseId });
       }
 
-      const notifyResult = await fetch("/_api/registration/notify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName:
-            values.fullName ||
-            profile?.fullName ||
-            profile?.displayName ||
-            "A student",
-          gender: values.gender || null,
-          address: values.address || null,
-          phoneNumber: values.phoneNumber,
-          dateOfBirth: values.dateOfBirth
-            ? format(values.dateOfBirth, "yyyy-MM-dd")
-            : null,
-          preferredPaymentMethod: values.preferredPaymentMethod || null,
-          bankAccountName: values.bankAccountName || null,
-          bankAccountNumber: values.bankAccountNumber || null,
-          bankName: values.bankName || null,
-          selectedCourseId: hasSelectedCourse ? selectedCourseId : null,
-          courseName: hasSelectedCourse
-            ? selectedCourse?.name || `Course #${selectedCourseId}`
-            : null,
-        }),
-      });
+      try {
+        const notifyResult = await fetch("/_api/registration/notify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fullName:
+              values.fullName ||
+              profile?.fullName ||
+              profile?.displayName ||
+              "A student",
+            gender: values.gender || null,
+            address: values.address || null,
+            phoneNumber: values.phoneNumber,
+            dateOfBirth: values.dateOfBirth
+              ? format(values.dateOfBirth, "yyyy-MM-dd")
+              : null,
+            preferredPaymentMethod: values.preferredPaymentMethod || null,
+            bankAccountName: values.bankAccountName || null,
+            bankAccountNumber: values.bankAccountNumber || null,
+            bankName: values.bankName || null,
+            selectedCourseId: hasSelectedCourse ? selectedCourseId : null,
+            courseName: hasSelectedCourse
+              ? selectedCourse?.name || `Course #${selectedCourseId}`
+              : null,
+          }),
+        });
 
-      if (!notifyResult.ok) {
-        let message = "Failed to send registration email";
-        try {
-          const payload = (await notifyResult.json()) as { error?: string };
-          if (payload?.error) message = payload.error;
-        } catch {}
-        throw new Error(message);
+        if (!notifyResult.ok) {
+          let message = "Failed to send registration email";
+          try {
+            const payload = (await notifyResult.json()) as { error?: string };
+            if (payload?.error) message = payload.error;
+          } catch {}
+          toast.error(message);
+        }
+      } catch {
+        toast.error("Failed to send registration email");
       }
 
       navigate("/dashboard");
@@ -198,6 +202,9 @@ export const RegistrationForm = () => {
                     mode="single"
                     selected={form.values.dateOfBirth || undefined}
                     onSelect={(date) => form.setValues(prev => ({ ...prev, dateOfBirth: date || null }))}
+                    captionLayout="dropdown"
+                    startMonth={new Date("1900-01-01")}
+                    endMonth={new Date()}
                     disabled={(date) =>
                       date > new Date() || date < new Date("1900-01-01")
                     }
