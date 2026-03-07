@@ -193,6 +193,17 @@ function isSchemaError(error: any): boolean {
   );
 }
 
+function isMissingEventNotificationColumnError(error: any): boolean {
+  const message = String(error?.message ?? "");
+  if (error?.code !== "PGRST204") return false;
+  return (
+    message.includes("notification1hId") ||
+    message.includes("notification24hId") ||
+    message.includes("notification_1h_id") ||
+    message.includes("notification_24h_id")
+  );
+}
+
 function formatUnknownError(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (error && typeof error === "object") {
@@ -713,14 +724,25 @@ async function handleEventsImport(rows: any[]) {
     }
 
     if (existingEvent?.id) {
-      const { error } = await supabaseAdmin
+      let { error } = await supabaseAdmin
         .from("events")
         .update(eventData)
         .eq("id", existingEvent.id);
+      if (error && isMissingEventNotificationColumnError(error)) {
+        const { notification1hId, notification24hId, ...fallbackData } = eventData;
+        ({ error } = await supabaseAdmin
+          .from("events")
+          .update(fallbackData)
+          .eq("id", existingEvent.id));
+      }
       if (error) throw error;
     } else {
       const insertData = row.id ? { ...eventData, id: row.id } : eventData;
-      const { error } = await supabaseAdmin.from("events").insert(insertData);
+      let { error } = await supabaseAdmin.from("events").insert(insertData);
+      if (error && isMissingEventNotificationColumnError(error)) {
+        const { notification1hId, notification24hId, ...fallbackData } = insertData;
+        ({ error } = await supabaseAdmin.from("events").insert(fallbackData));
+      }
       if (error) throw error;
     }
 
