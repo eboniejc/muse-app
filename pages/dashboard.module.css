@@ -111,6 +111,16 @@
   transition: border-color var(--animation-duration-fast);
 }
 
+.eventFlyer {
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  object-fit: cover;
+  flex-shrink: 0;
+  background-color: var(--surface);
+}
+
 .listItem:hover {
   border-color: var(--border);
 }
@@ -212,5 +222,10 @@
 @media (max-width: 768px) {
   .contentGrid {
     grid-template-columns: 1fr;
+  }
+
+  .eventFlyer {
+    width: 3.5rem;
+    height: 3.5rem;
   }
 }

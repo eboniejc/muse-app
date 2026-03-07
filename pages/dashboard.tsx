@@ -144,6 +144,14 @@ export default function DashboardPage() {
             ) : events && events.length > 0 ? (
               events.slice(0, 3).map((event) => (
                 <div key={event.id} className={styles.listItem}>
+                  {event.flyerUrl ? (
+                    <img
+                      src={event.flyerUrl}
+                      alt={`${event.title} flyer`}
+                      className={styles.eventFlyer}
+                      loading="lazy"
+                    />
+                  ) : null}
                   <div className={styles.dateBox}>
                     <span className={styles.day}>{format(new Date(event.startAt), "dd")}</span>
                     <span className={styles.month}>{format(new Date(event.startAt), "MMM")}</span>
