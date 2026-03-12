@@ -51,21 +51,22 @@
 
 :root {
   /* Brand foundation (MUSE INC) */
-  --background: hsl(0 0% 4%);
-  --foreground: hsl(0 0% 98%);
+  /* Light theme (default) */
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(222 47% 11%);
 
-  /* Surfaces - Slightly elevated, mimicking hardware casing */
-  --surface: hsl(220 7% 12%);
-  --surface-foreground: hsl(0 0% 93%);
+  /* Surfaces */
+  --surface: hsl(210 40% 98%);
+  --surface-foreground: hsl(222 47% 11%);
   
-  --sidebar: hsl(220 9% 10%);
-  --sidebar-foreground: hsl(0 0% 90%);
+  --sidebar: hsl(210 40% 98%);
+  --sidebar-foreground: hsl(222 47% 11%);
   
-  --card: hsl(220 8% 11%);
-  --card-foreground: hsl(0 0% 96%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 47% 11%);
   
-  --popup: hsl(220 8% 14%);
-  --popup-foreground: hsl(0 0% 98%);
+  --popup: hsl(0 0% 100%);
+  --popup-foreground: hsl(222 47% 11%);
 
   /* Brand colors from guide */
   --primary: hsl(220 100% 30%); /* #003399 */
@@ -78,8 +79,8 @@
   --accent-foreground: hsl(0 0% 100%);
 
   /* Muted - For inactive states/faders */
-  --muted: hsl(220 6% 20%);
-  --muted-foreground: hsl(0 0% 67%);
+  --muted: hsl(210 40% 96%);
+  --muted-foreground: hsl(215 16% 47%);
 
   /* Functional Colors */
   --success: hsl(150 70% 45%);
@@ -97,7 +98,7 @@
   --info-active: hsl(200 80% 40%);
 
   /* Borders - Subtle, technical, neutral */
-  --border: hsl(220 5% 25%);
+  --border: hsl(214 32% 91%);
 
   /* Font Families */
   --font-family-base: 'Manrope', sans-serif;
@@ -106,10 +107,10 @@
   --font-family-cursive: 'Permanent Marker', cursive; /* Rarely used, maybe for instructor notes */
 
   /* Shadows - Very subtle, mostly for depth in popups */
-  --shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.5);
-  --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.5), 0 2px 4px -1px hsl(0 0% 0% / 0.3);
-  --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.6), 0 4px 6px -2px hsl(0 0% 0% / 0.4);
-  --shadow-focus: 0 0 0 2px hsl(0 0% 4%), 0 0 0 4px var(--primary);
+  --shadow: 0 1px 2px 0 hsl(222 47% 11% / 0.08);
+  --shadow-md: 0 4px 6px -1px hsl(222 47% 11% / 0.10), 0 2px 4px -1px hsl(222 47% 11% / 0.06);
+  --shadow-lg: 0 10px 15px -3px hsl(222 47% 11% / 0.12), 0 4px 6px -2px hsl(222 47% 11% / 0.08);
+  --shadow-focus: 0 0 0 2px hsl(0 0% 100%), 0 0 0 4px var(--primary);
 
   /* Radius - Technical, sharp, hardware-like */
   --radius-sm: 2px;
@@ -130,12 +131,39 @@
   --chart-color-5: hsl(220 6% 32%);
   
   /* Special Effects */
-  --glass-panel: hsl(0 0% 12% / 0.7);
-  --led-glow: 0 0 10px var(--primary);
+  --glass-panel: hsl(0 0% 100% / 0.7);
+  --led-glow: 0 0 10px color-mix(in srgb, var(--primary) 50%, transparent);
 }
 
 .dark {
-  /* Empty block as the design is dark-mode native/exclusive */
+  /* Dark theme */
+  --background: hsl(0 0% 4%);
+  --foreground: hsl(0 0% 98%);
+
+  --surface: hsl(220 7% 12%);
+  --surface-foreground: hsl(0 0% 93%);
+
+  --sidebar: hsl(220 9% 10%);
+  --sidebar-foreground: hsl(0 0% 90%);
+
+  --card: hsl(220 8% 11%);
+  --card-foreground: hsl(0 0% 96%);
+
+  --popup: hsl(220 8% 14%);
+  --popup-foreground: hsl(0 0% 98%);
+
+  --muted: hsl(220 6% 20%);
+  --muted-foreground: hsl(0 0% 67%);
+
+  --border: hsl(220 5% 25%);
+
+  --shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.5);
+  --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.5), 0 2px 4px -1px hsl(0 0% 0% / 0.3);
+  --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.6), 0 4px 6px -2px hsl(0 0% 0% / 0.4);
+  --shadow-focus: 0 0 0 2px hsl(0 0% 4%), 0 0 0 4px var(--primary);
+
+  --glass-panel: hsl(0 0% 12% / 0.7);
+  --led-glow: 0 0 10px var(--primary);
 }
 @layer base {
   ul {

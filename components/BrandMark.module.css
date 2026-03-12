@@ -11,11 +11,47 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 0;
 }
 
 .svg {
   width: 100%;
   height: 100%;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  display: block;
+  /* Outline effect so white/transparent logos are visible on white backgrounds */
+  filter:
+    drop-shadow(0 1px 1px hsl(222 47% 11% / 0.22))
+    drop-shadow(1px 0 0 hsl(222 47% 11% / 0.55))
+    drop-shadow(-1px 0 0 hsl(222 47% 11% / 0.55))
+    drop-shadow(0 1px 0 hsl(222 47% 11% / 0.55))
+    drop-shadow(0 -1px 0 hsl(222 47% 11% / 0.55));
+}
+
+:global(.dark) .img {
+  filter:
+    drop-shadow(0 1px 1px hsl(0 0% 0% / 0.60))
+    drop-shadow(1px 0 0 hsl(0 0% 0% / 0.75))
+    drop-shadow(-1px 0 0 hsl(0 0% 0% / 0.75))
+    drop-shadow(0 1px 0 hsl(0 0% 0% / 0.75))
+    drop-shadow(0 -1px 0 hsl(0 0% 0% / 0.75));
+}
+
+.hasImg .mark {
+  overflow: visible;
+  box-sizing: border-box;
+  padding: 1px; /* give the outline/shadow room so it doesn't clip */
+}
+
+.backplate .mark {
+  background-color: hsl(222 47% 11%);
+  border-radius: 0;
 }
 
 .stroke {
