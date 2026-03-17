@@ -45,14 +45,6 @@ export default function InstructorsPage() {
       whatsappNumber: "+84932222292",
       whatsappLink: "https://wa.me/84932222292",
     },
-    {
-      id: -5,
-      displayName: "DJ ChieChan",
-      email: "",
-      avatarUrl: null,
-      whatsappNumber: "+84901931801",
-      whatsappLink: "https://wa.me/84901931801",
-    },
   ];
 
   const mergedInstructors = React.useMemo(() => {
