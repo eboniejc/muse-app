@@ -116,6 +116,8 @@ const resources = {
         cancelError: "Failed to cancel booking",
         selectRoomFirst: "Please select a room first",
         noBookings: "No bookings for this day. Be the first!",
+        cancelBooking: "Cancel Booking",
+        keep: "Keep",
       },
       dashboard: {
         welcome: "Welcome back, {{name}}",
@@ -308,6 +310,8 @@ const resources = {
         cancelError: "Hủy đặt phòng thất bại",
         selectRoomFirst: "Vui lòng chọn phòng trước",
         noBookings: "Chưa có đặt phòng ngày này. Hãy là người đầu tiên!",
+        cancelBooking: "Hủy đặt phòng",
+        keep: "Giữ",
       },
       dashboard: {
         welcome: "Chào mừng, {{name}}",

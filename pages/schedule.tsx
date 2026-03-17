@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { RoomList } from "../components/RoomList";
 import { BookingForm } from "../components/BookingForm";
 import { Calendar } from "../components/Calendar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../components/Dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/Dialog";
 import { Button } from "../components/Button";
 import { useRoomBookings } from "../helpers/useRoomBookings";
 import { useCancelRoomBooking } from "../helpers/useCancelRoomBooking";
@@ -18,6 +18,8 @@ export default function SchedulePage() {
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [pendingCancelId, setPendingCancelId] = useState<number | null>(null);
 
   const { data: bookings, refetch } = useRoomBookings({
     roomId: selectedRoomId || undefined,
@@ -26,14 +28,20 @@ export default function SchedulePage() {
 
   const { mutateAsync: cancelBooking } = useCancelRoomBooking();
 
-  const handleCancel = async (bookingId: number) => {
-    if (confirm(t('schedule.cancelConfirm'))) {
-      try {
-        await cancelBooking({ bookingId });
-        toast.success(t('schedule.bookingCancelled'));
-      } catch (error) {
-        toast.error(t('schedule.cancelError'));
-      }
+  const handleCancel = (bookingId: number) => {
+    setPendingCancelId(bookingId);
+    setIsCancelDialogOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!pendingCancelId) return;
+    try {
+      await cancelBooking({ bookingId: pendingCancelId });
+      toast.success(t('schedule.bookingCancelled'));
+      setIsCancelDialogOpen(false);
+      setPendingCancelId(null);
+    } catch (error) {
+      toast.error(t('schedule.cancelError'));
     }
   };
 
@@ -134,6 +142,22 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('schedule.cancelBooking')}</DialogTitle>
+            <DialogDescription>{t('schedule.cancelConfirm')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsCancelDialogOpen(false)}>
+              {t('schedule.keep')}
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmCancel}>
+              {t('schedule.cancelBooking')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, CheckCircle2 } from "lucide-react";
 import { useForm, Form, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "./Form";
 import { Input } from "./Input";
 import { Button } from "./Button";
@@ -30,6 +30,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export const RegistrationForm = () => {
   const navigate = useNavigate();
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [searchParams] = useSearchParams();
   const selectedCourseId = Number(searchParams.get("courseId"));
   const hasSelectedCourse = Number.isFinite(selectedCourseId) && selectedCourseId > 0;
@@ -123,7 +124,7 @@ export const RegistrationForm = () => {
         toast.error("Failed to send registration email");
       }
 
-      navigate("/dashboard");
+      setIsSubmitted(true);
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);
@@ -138,6 +139,21 @@ export const RegistrationForm = () => {
 
   if (isLoading) {
     return <div className={styles.loading}>Loading profile data...</div>;
+  }
+
+  if (isSubmitted) {
+    return (
+      <div className={styles.successState}>
+        <CheckCircle2 size={56} className={styles.successIcon} />
+        <h2 className={styles.successTitle}>Đăng ký thành công! (Registration Complete!)</h2>
+        <p className={styles.successText}>
+          Your profile has been saved. Welcome to MUSE INC!
+        </p>
+        <Button size="lg" onClick={() => navigate("/dashboard")}>
+          Go to Dashboard
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -202,13 +218,10 @@ export const RegistrationForm = () => {
                     mode="single"
                     selected={form.values.dateOfBirth || undefined}
                     onSelect={(date) => form.setValues(prev => ({ ...prev, dateOfBirth: date || null }))}
-                    captionLayout="dropdown"
-                    startMonth={new Date("1900-01-01")}
-                    endMonth={new Date()}
+                    defaultMonth={form.values.dateOfBirth || new Date(new Date().getFullYear() - 20, 0)}
                     disabled={(date) =>
                       date > new Date() || date < new Date("1900-01-01")
                     }
-                    initialFocus
                   />
                 </PopoverContent>
               </Popover>

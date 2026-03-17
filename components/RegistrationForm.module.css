@@ -125,6 +125,29 @@
   color: var(--muted-foreground);
 }
 
+.successState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-6);
+  padding: var(--spacing-12) var(--spacing-8);
+  text-align: center;
+}
+
+.successIcon {
+  color: var(--success, #22c55e);
+}
+
+.successTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.successText {
+  color: var(--muted-foreground);
+  max-width: 400px;
+}
+
 @media (max-width: 640px) {
   .row {
     flex-direction: column;

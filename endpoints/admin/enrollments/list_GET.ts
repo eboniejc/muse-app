@@ -70,10 +70,20 @@ export async function handle(request: Request) {
       .where("enrollmentId", "in", enrollmentIds)
       .execute();
 
-    // Map completions to enrollments
+    // Fetch lesson schedules for these enrollments
+    const allSchedules = await db
+      .selectFrom("lessonSchedules")
+      .select(["enrollmentId", "lessonNumber", "scheduledAt"])
+      .where("enrollmentId", "in", enrollmentIds)
+      .execute();
+
+    // Map completions and schedules to enrollments
     const enrollmentsWithDetails = enrollments.map((enrollment) => {
       const completions = allCompletions.filter(
         (c) => c.enrollmentId === enrollment.id
+      );
+      const schedules = allSchedules.filter(
+        (s) => s.enrollmentId === enrollment.id
       );
 
       return {
@@ -86,13 +96,17 @@ export async function handle(request: Request) {
         studentName: enrollment.studentName,
         studentEmail: enrollment.studentEmail,
         status: enrollment.status,
-        enrolledAt: enrollment.enrolledAt ? new Date(enrollment.enrolledAt) : new Date(), // Fallback shouldn't happen if data is good
+        enrolledAt: enrollment.enrolledAt ? new Date(enrollment.enrolledAt) : new Date(),
         completedAt: enrollment.completedAt ? new Date(enrollment.completedAt) : null,
         progressPercentage: enrollment.progressPercentage ?? 0,
         completedLessons: completions.length,
         lessonCompletions: completions.map((c) => ({
           lessonNumber: c.lessonNumber,
           completedAt: new Date(c.completedAt),
+        })),
+        lessonSchedules: schedules.map((s) => ({
+          lessonNumber: s.lessonNumber,
+          scheduledAt: new Date(s.scheduledAt),
         })),
       };
     });

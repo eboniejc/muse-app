@@ -460,8 +460,7 @@ async function handleLessonSchedulesImport(rows: any[]) {
     let scheduleTable = "lessonSchedules";
 
     const fetchExistingById = async (table: string) => {
-      const idCol = table === "lessonSchedules" ? "id" : "id";
-      return supabaseAdmin.from(table).select("*").eq(idCol, row.id).limit(1).maybeSingle();
+      return supabaseAdmin.from(table).select("*").eq("id", row.id).limit(1).maybeSingle();
     };
     const fetchExistingByKey = async (table: string) => {
       if (table === "lessonSchedules") {

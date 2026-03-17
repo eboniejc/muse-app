@@ -328,6 +328,34 @@ app.post('_api/admin/lessons/uncomplete',async c => {
     return c.text("Error loading endpoint code " + e.message,  500)
   }
 })
+app.post('_api/admin/lessons/schedule',async c => {
+  try {
+    const { handle } = await importEndpoint("./endpoints/admin/lessons/schedule_POST");
+    let request = c.req.raw;
+    const response = await handle(request);
+    if (!(response instanceof Response) && response.constructor.name !== "Response") {
+      return c.text("Invalid response format. handle should always return a Response object." + response.constructor.name, 500);
+    }
+    return response;
+  } catch (e) {
+    console.error(e);
+    return c.text("Error loading endpoint code " + e.message,  500)
+  }
+})
+app.post('_api/admin/events/notify',async c => {
+  try {
+    const { handle } = await importEndpoint("./endpoints/admin/events/notify_POST");
+    let request = c.req.raw;
+    const response = await handle(request);
+    if (!(response instanceof Response) && response.constructor.name !== "Response") {
+      return c.text("Invalid response format. handle should always return a Response object." + response.constructor.name, 500);
+    }
+    return response;
+  } catch (e) {
+    console.error(e);
+    return c.text("Error loading endpoint code " + e.message,  500)
+  }
+})
 app.post('_api/sheets/export',async c => {
   try {
     const { handle } = await importEndpoint("./endpoints/sheets/export_POST");

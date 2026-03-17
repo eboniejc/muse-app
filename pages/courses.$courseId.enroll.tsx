@@ -210,12 +210,12 @@ export default function CourseEnrollPage() {
 
                 <div className={styles.formGroup}>
                   <label className={styles.label}>{t("registration.dob")}</label>
-                  <Input 
-                    type="date" 
-                    {...form.register("dateOfBirth", { valueAsDate: true })} 
-                    // Format date for input: YYYY-MM-DD
+                  <Input
+                    type="date"
+                    name="dateOfBirth"
                     value={form.watch("dateOfBirth") ? new Date(form.watch("dateOfBirth")!).toISOString().split('T')[0] : ''}
-                    disabled={isSubmitting} 
+                    onChange={(e) => form.setValue("dateOfBirth", e.target.valueAsDate || undefined, { shouldValidate: true })}
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.dateOfBirth && (
                     <span className={styles.error}>{form.formState.errors.dateOfBirth.message}</span>

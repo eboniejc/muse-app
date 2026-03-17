@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation, useNavigationType } from "react-router-dom";
 import { GlobalContextProviders } from "./components/_globalContextProviders";
 import Page_0 from "./pages/login.tsx";
 import PageLayout_0 from "./pages/login.pageLayout.tsx";
@@ -21,14 +21,13 @@ import Page_8 from "./pages/courses.$courseId.enroll.tsx";
 import PageLayout_8 from "./pages/courses.$courseId.enroll.pageLayout.tsx";
 import Page_9 from "./pages/admin.tsx";
 import PageLayout_9 from "./pages/admin.pageLayout.tsx";
+import "./base.css";
 
 if (!window.requestIdleCallback) {
   window.requestIdleCallback = (cb) => {
     setTimeout(cb, 1);
   };
 }
-
-import "./base.css";
 
 const fileNameToRoute = new Map([["./pages/login.tsx","/login"],["./pages/_index.tsx","/"],["./pages/ebooks.tsx","/ebooks"],["./pages/courses.tsx","/courses"],["./pages/schedule.tsx","/schedule"],["./pages/dashboard.tsx","/dashboard"],["./pages/instructors.tsx","/instructors"],["./pages/complete-registration.tsx","/complete-registration"],["./pages/courses.$courseId.enroll.tsx","/courses/:courseId/enroll"],["./pages/admin.tsx","/admin"]]);
 const fileNameToComponent = new Map([
@@ -46,6 +45,7 @@ const fileNameToComponent = new Map([
 
 function makePageRoute(filename: string) {
   const Component = fileNameToComponent.get(filename);
+  if (!Component) throw new Error(`No component found for route: ${filename}`);
   return <Component />;
 }
 
@@ -116,9 +116,7 @@ function NotFound() {
   );
 }
 
-import { useLocation, useNavigationType } from "react-router-dom";
-
-export default function ScrollManager() {
+function ScrollManager() {
   const { pathname, search, hash } = useLocation();
   const navType = useNavigationType(); // "PUSH" | "REPLACE" | "POP"
 

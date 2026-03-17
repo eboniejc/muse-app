@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { Helmet } from "react-helmet";
 import { useTranslation } from "react-i18next";
-import { Search, SlidersHorizontal } from "lucide-react";
-import { useAdminEnrollments } from "../helpers/useAdminEnrollments";
+import { Search, SlidersHorizontal, Bell, PartyPopper } from "lucide-react";
+import { format } from "date-fns";
+import { useAdminEnrollments, useScheduleEventNotifications } from "../helpers/useAdminEnrollments";
+import { useUpcomingEvents } from "../helpers/useUpcomingEvents";
 import { useCourses } from "../helpers/useCourses";
+import { Button } from "../components/Button";
 import { Input } from "../components/Input";
 import {
   Select,
@@ -21,12 +24,12 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [notifiedEventIds, setNotifiedEventIds] = useState<Set<number>>(new Set());
+
+  const { data: upcomingEvents } = useUpcomingEvents();
+  const scheduleEventMutation = useScheduleEventNotifications();
 
   const { data: courses } = useCourses();
-  
-  // Pass filters to the hook if needed for server-side filtering, 
-  // but for search we'll likely do client-side if the dataset is small enough or the hook supports it.
-  // The hook supports courseId and status.
   const { data: enrollments, isLoading } = useAdminEnrollments({
     status: statusFilter !== "all" ? statusFilter : undefined,
     courseId: courseFilter !== "all" ? Number(courseFilter) : undefined,
@@ -106,6 +109,42 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {upcomingEvents && upcomingEvents.length > 0 && (
+        <div className={styles.eventsSection}>
+          <h2 className={styles.eventsSectionTitle}>
+            <PartyPopper size={18} />
+            Upcoming Events — Schedule Notifications
+          </h2>
+          <div className={styles.eventsList}>
+            {upcomingEvents.map((event) => (
+              <div key={event.id} className={styles.eventRow}>
+                <div className={styles.eventInfo}>
+                  <span className={styles.eventName}>{event.title}</span>
+                  <span className={styles.eventDate}>{format(new Date(event.startAt), "EEE, MMM d 'at' h:mm a")}</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={notifiedEventIds.has(event.id) || scheduleEventMutation.isPending}
+                  onClick={() =>
+                    scheduleEventMutation.mutate(
+                      { eventId: event.id },
+                      {
+                        onSuccess: () =>
+                          setNotifiedEventIds((prev) => new Set([...prev, event.id])),
+                      }
+                    )
+                  }
+                >
+                  <Bell size={14} />
+                  {notifiedEventIds.has(event.id) ? "Notifications Scheduled" : "Schedule Notifications"}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className={styles.content}>
         {isLoading ? (

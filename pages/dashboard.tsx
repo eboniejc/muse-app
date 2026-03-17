@@ -118,10 +118,10 @@ export default function DashboardPage() {
                   <div className={styles.itemDetails}>
                     <h3 className={styles.itemTitle}>{enrollment.courseName}</h3>
                     <p className={styles.itemSub}>
-                      Status: {enrollment.status}
+                      {t('admin.status')}: {t(`admin.${enrollment.status}`)}
                     </p>
                   </div>
-                  <div className={styles.statusIndicator} data-status="confirmed" />
+                  <div className={styles.statusIndicator} data-status={enrollment.status} />
                 </div>
               ))
             ) : (
