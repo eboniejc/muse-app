@@ -175,9 +175,37 @@ function parseLessonNumber(value: unknown, fallback: number): number {
   return fallback;
 }
 
+// Vietnam timezone offset: UTC+7
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+
 function normalizeDateToIso(value: unknown): string | null {
   if (!value) return null;
-  const date = new Date(value as any);
+  const raw = value as any;
+  // If the value is a plain date string with no timezone info (e.g. "2026-03-20 10:00"
+  // or "3/20/2026 10:00"), treat it as Vietnam time (UTC+7).
+  if (typeof raw === "string") {
+    const hasTimezone = /[Zz]|[+-]\d{2}:?\d{2}$/.test(raw.trim());
+    if (!hasTimezone) {
+      // Parse as local and offset to Vietnam
+      const local = new Date(raw);
+      if (Number.isNaN(local.getTime())) return null;
+      // Subtract server UTC offset, add Vietnam offset so the wall-clock time is preserved as VN
+      const serverOffsetMs = local.getTimezoneOffset() * 60 * 1000; // getTimezoneOffset is UTC - local
+      const utc = new Date(local.getTime() + serverOffsetMs - VN_OFFSET_MS);
+      return utc.toISOString();
+    }
+  }
+  // Google Sheets serial numbers (numbers) — treat as VN midnight
+  if (typeof raw === "number") {
+    // Sheets epoch: Dec 30, 1899; JS epoch: Jan 1, 1970
+    const MS_PER_DAY = 86400000;
+    const SHEETS_EPOCH_OFFSET = 25569; // days from Sheets epoch to JS epoch
+    const utcMs = (raw - SHEETS_EPOCH_OFFSET) * MS_PER_DAY - VN_OFFSET_MS;
+    const date = new Date(utcMs);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString();
+  }
+  const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
 }
@@ -554,14 +582,14 @@ async function handleLessonSchedulesImport(rows: any[]) {
     if (timeChanged) {
       let { data: enrollment, error: enrollmentErr } = await supabaseAdmin
         .from("courseEnrollments")
-        .select("userId")
+        .select("userId, courseId")
         .eq("id", row.enrollmentId)
         .limit(1)
         .maybeSingle();
       if (enrollmentErr && isSchemaError(enrollmentErr)) {
         ({ data: enrollment, error: enrollmentErr } = await supabaseAdmin
           .from("course_enrollments")
-          .select("user_id")
+          .select("user_id, course_id")
           .eq("id", row.enrollmentId)
           .limit(1)
           .maybeSingle());
@@ -569,6 +597,51 @@ async function handleLessonSchedulesImport(rows: any[]) {
       if (enrollmentErr && enrollmentErr.code !== "PGRST116") throw enrollmentErr;
 
       const enrollmentUserId = enrollment?.userId ?? enrollment?.user_id;
+      const enrollmentCourseId = enrollment?.courseId ?? enrollment?.course_id;
+
+      // Notify the instructor immediately (no send_after) when a lesson is scheduled
+      if (enrollmentCourseId) {
+        try {
+          const { data: course } = await supabaseAdmin
+            .from("courses")
+            .select("instructorId, name")
+            .eq("id", enrollmentCourseId)
+            .limit(1)
+            .maybeSingle();
+
+          if (course?.instructorId) {
+            const { data: student } = await supabaseAdmin
+              .from("users")
+              .select("displayName")
+              .eq("id", enrollmentUserId)
+              .limit(1)
+              .maybeSingle();
+
+            const studentLabel = student?.displayName ?? "A student";
+            const lessonLabel = `Lesson ${row.lessonNumber}`;
+            const timeStr = scheduledDate.toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+
+            await sendPushNotification({
+              headings: { en: "New Lesson Scheduled", vi: "Lịch học mới được đặt" },
+              contents: {
+                en: `${studentLabel} — ${course.name} ${lessonLabel} on ${timeStr}`,
+                vi: `${studentLabel} — ${course.name} ${lessonLabel} vào ${scheduledDate.toLocaleDateString("vi-VN")}`,
+              },
+              includeExternalUserIds: [String(course.instructorId)],
+              // No send_after → delivers immediately
+            });
+          }
+        } catch {
+          // Non-fatal: if instructor notification fails, don't block the import
+        }
+      }
+
       if (enrollmentUserId) {
         const userId = String(enrollmentUserId);
         const now = new Date();

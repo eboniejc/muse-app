@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Calendar, GraduationCap, Menu, BookOpen, Users, Shield } from "lucide-react";
+import { LayoutDashboard, Calendar, GraduationCap, Menu, BookOpen, Users, Shield, CalendarDays } from "lucide-react";
 import { Button } from "./Button";
 import { UserDropdown } from "./UserDropdown";
 import { Sheet, SheetContent, SheetTrigger } from "./Sheet";
@@ -27,6 +27,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     { label: t('nav.ebooks'), href: "/ebooks", icon: BookOpen },
     { label: t('nav.instructors'), href: "/instructors", icon: Users },
   ];
+
+  if (user?.role === "instructor") {
+    navItems.push({ label: "My Schedule", href: "/instructor-schedule", icon: CalendarDays });
+  }
 
   if (user?.role === "admin") {
     navItems.push({ label: t('nav.admin'), href: "/admin", icon: Shield });

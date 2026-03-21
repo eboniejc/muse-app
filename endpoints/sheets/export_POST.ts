@@ -149,6 +149,9 @@ function buildFlattenedEnrollments(input: {
   const userById = new Map(
     (users ?? []).map((row: any) => [String(readField(row, "id")), row])
   );
+  const instructorById = new Map(
+    (users ?? []).map((row: any) => [String(readField(row, "id")), row])
+  );
   const profileByUserId = new Map(
     (userProfiles ?? []).map((row: any) => [
       String(readField(row, "userId", "user_id")),
@@ -185,6 +188,8 @@ function buildFlattenedEnrollments(input: {
     const course = courseById.get(String(courseId));
     const user = userById.get(String(userId));
     const profile = profileByUserId.get(String(userId));
+    const instructorId = readField<string | number>(course ?? {}, "instructorId", "instructor_id");
+    const instructor = instructorId ? instructorById.get(String(instructorId)) : null;
 
     const row: Record<string, unknown> = {
       enrollmentId,
@@ -203,6 +208,9 @@ function buildFlattenedEnrollments(input: {
       courseName: readField(course ?? {}, "name") ?? "",
       totalLessons: Number(readField(course ?? {}, "totalLessons", "total_lessons") ?? 0),
       enrollmentStatus: readField(enrollment, "status") ?? "active",
+      instructorId: instructorId ?? "",
+      instructorName: readField(instructor ?? {}, "displayName", "displayname") ?? "",
+      instructorEmail: readField(instructor ?? {}, "email") ?? "",
     };
 
     for (let i = 1; i <= MAX_LESSONS; i++) {

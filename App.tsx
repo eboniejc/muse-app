@@ -21,6 +21,8 @@ import Page_8 from "./pages/courses.$courseId.enroll.tsx";
 import PageLayout_8 from "./pages/courses.$courseId.enroll.pageLayout.tsx";
 import Page_9 from "./pages/admin.tsx";
 import PageLayout_9 from "./pages/admin.pageLayout.tsx";
+import Page_10 from "./pages/instructor-schedule.tsx";
+import PageLayout_10 from "./pages/instructor-schedule.pageLayout.tsx";
 import "./base.css";
 
 if (!window.requestIdleCallback) {
@@ -29,7 +31,7 @@ if (!window.requestIdleCallback) {
   };
 }
 
-const fileNameToRoute = new Map([["./pages/login.tsx","/login"],["./pages/_index.tsx","/"],["./pages/ebooks.tsx","/ebooks"],["./pages/courses.tsx","/courses"],["./pages/schedule.tsx","/schedule"],["./pages/dashboard.tsx","/dashboard"],["./pages/instructors.tsx","/instructors"],["./pages/complete-registration.tsx","/complete-registration"],["./pages/courses.$courseId.enroll.tsx","/courses/:courseId/enroll"],["./pages/admin.tsx","/admin"]]);
+const fileNameToRoute = new Map([["./pages/login.tsx","/login"],["./pages/_index.tsx","/"],["./pages/ebooks.tsx","/ebooks"],["./pages/courses.tsx","/courses"],["./pages/schedule.tsx","/schedule"],["./pages/dashboard.tsx","/dashboard"],["./pages/instructors.tsx","/instructors"],["./pages/complete-registration.tsx","/complete-registration"],["./pages/courses.$courseId.enroll.tsx","/courses/:courseId/enroll"],["./pages/admin.tsx","/admin"],["./pages/instructor-schedule.tsx","/instructor-schedule"]]);
 const fileNameToComponent = new Map([
     ["./pages/login.tsx", Page_0],
 ["./pages/_index.tsx", Page_1],
@@ -41,6 +43,7 @@ const fileNameToComponent = new Map([
 ["./pages/complete-registration.tsx", Page_7],
 ["./pages/courses.$courseId.enroll.tsx", Page_8],
 ["./pages/admin.tsx", Page_9],
+["./pages/instructor-schedule.tsx", Page_10],
   ]);
 
 function makePageRoute(filename: string) {
@@ -150,6 +153,7 @@ export function App() {
 "./pages/complete-registration.tsx": PageLayout_7,
 "./pages/courses.$courseId.enroll.tsx": PageLayout_8,
 "./pages/admin.tsx": PageLayout_9,
+"./pages/instructor-schedule.tsx": PageLayout_10,
 }), fileNameToRoute, makePageRoute })} 
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -58,6 +58,30 @@
   padding: 0;
 }
 
+.dobRow {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.dobSelect {
+  flex: 1;
+  height: 2.5rem;
+  padding: 0 var(--spacing-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background-color: var(--background);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  cursor: pointer;
+  outline: none;
+  min-width: 0;
+}
+
+.dobSelect:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
 .radioGroup {
   display: flex;
   flex-direction: column;

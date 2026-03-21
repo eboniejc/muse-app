@@ -1,0 +1,111 @@
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: var(--spacing-6);
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 var(--spacing-1);
+}
+
+.subtitle {
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+.emptyState {
+  text-align: center;
+  padding: var(--spacing-16) var(--spacing-8);
+  color: var(--muted-foreground);
+}
+
+.emptyIcon {
+  margin-bottom: var(--spacing-4);
+  opacity: 0.4;
+}
+
+.dayGroup {
+  margin-bottom: var(--spacing-8);
+}
+
+.dayLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  padding: var(--spacing-2) 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--spacing-3);
+}
+
+.lessonCard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: var(--spacing-3);
+}
+
+.timeCol {
+  min-width: 4.5rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.time {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.lessonNum {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-top: var(--spacing-1);
+}
+
+.infoCol {
+  flex: 1;
+  min-width: 0;
+}
+
+.studentName {
+  font-weight: 600;
+  margin-bottom: var(--spacing-1);
+}
+
+.courseName {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.ebookRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+  font-size: 0.8125rem;
+}
+
+.ebookUnlocked {
+  color: var(--success, #22c55e);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.ebookLocked {
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}

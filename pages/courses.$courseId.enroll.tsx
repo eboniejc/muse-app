@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
@@ -107,6 +107,50 @@ export default function CourseEnrollPage() {
     }
   };
 
+  // DOB split-select state
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobDay, setDobDay] = useState("");
+  const [dobYear, setDobYear] = useState("");
+
+  // Sync split selects → form value (noon Vietnam time = UTC+7, stored as 05:00 UTC)
+  useEffect(() => {
+    if (dobMonth && dobDay && dobYear) {
+      const isoString = `${dobYear}-${String(dobMonth).padStart(2, "0")}-${String(dobDay).padStart(2, "0")}T05:00:00.000Z`;
+      const d = new Date(isoString);
+      if (!isNaN(d.getTime())) {
+        form.setValue("dateOfBirth", d, { shouldValidate: true });
+      }
+    } else {
+      form.setValue("dateOfBirth", undefined, { shouldValidate: false });
+    }
+  }, [dobMonth, dobDay, dobYear]);
+
+  // Sync form value → split selects when profile loads
+  useEffect(() => {
+    const dob = form.getValues("dateOfBirth");
+    if (dob) {
+      const d = new Date(dob);
+      setDobMonth(String(d.getMonth() + 1));
+      setDobDay(String(d.getDate()));
+      setDobYear(String(d.getFullYear()));
+    }
+  }, [userProfile]);
+
+  const currentYear = new Date().getFullYear();
+  const dobYears = Array.from({ length: 101 }, (_, i) => currentYear - i);
+  const dobMonths = [
+    { value: "1", label: "January" }, { value: "2", label: "February" },
+    { value: "3", label: "March" }, { value: "4", label: "April" },
+    { value: "5", label: "May" }, { value: "6", label: "June" },
+    { value: "7", label: "July" }, { value: "8", label: "August" },
+    { value: "9", label: "September" }, { value: "10", label: "October" },
+    { value: "11", label: "November" }, { value: "12", label: "December" },
+  ];
+  const daysInMonth = dobMonth && dobYear
+    ? new Date(Number(dobYear), Number(dobMonth), 0).getDate()
+    : 31;
+  const dobDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
   const isLoading = coursesLoading || profileLoading;
   const isSubmitting = updateProfileMutation.isPending || enrollCourseMutation.isPending;
 
@@ -210,13 +254,41 @@ export default function CourseEnrollPage() {
 
                 <div className={styles.formGroup}>
                   <label className={styles.label}>{t("registration.dob")}</label>
-                  <Input
-                    type="date"
-                    name="dateOfBirth"
-                    value={form.watch("dateOfBirth") ? new Date(form.watch("dateOfBirth")!).toISOString().split('T')[0] : ''}
-                    onChange={(e) => form.setValue("dateOfBirth", e.target.valueAsDate || undefined, { shouldValidate: true })}
-                    disabled={isSubmitting}
-                  />
+                  <div className={styles.dobRow}>
+                    <select
+                      className={styles.dobSelect}
+                      value={dobMonth}
+                      onChange={(e) => setDobMonth(e.target.value)}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Month</option>
+                      {dobMonths.map((m) => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                    <select
+                      className={styles.dobSelect}
+                      value={dobDay}
+                      onChange={(e) => setDobDay(e.target.value)}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Day</option>
+                      {dobDays.map((d) => (
+                        <option key={d} value={String(d)}>{d}</option>
+                      ))}
+                    </select>
+                    <select
+                      className={styles.dobSelect}
+                      value={dobYear}
+                      onChange={(e) => setDobYear(e.target.value)}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Year</option>
+                      {dobYears.map((y) => (
+                        <option key={y} value={String(y)}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
                   {form.formState.errors.dateOfBirth && (
                     <span className={styles.error}>{form.formState.errors.dateOfBirth.message}</span>
                   )}
