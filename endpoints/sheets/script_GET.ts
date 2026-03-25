@@ -25,6 +25,8 @@ function onOpen() {
     .addSeparator()
     .addItem("Sync Lessons to Google Calendar", "syncToCalendar")
     .addItem("Sync Events to Google Calendar", "syncEventsToCalendar")
+    .addSeparator()
+    .addItem("View Monthly Calendar", "renderMonthCalendar")
     .addToUi();
 }
 
@@ -216,6 +218,7 @@ function syncToCalendar() {
 
   rows.forEach(function(row) {
     const studentName = row.studentName || "Unknown Student";
+    const studentEmail = row.email || "";
     const courseName = row.courseName || "Unknown Course";
     const instructorName = row.instructorName || "";
     const instructorEmail = row.instructorEmail || "";
@@ -243,6 +246,10 @@ function syncToCalendar() {
       descLines.push(uniqueTag);
       const description = descLines.join("\\n");
 
+      // Combine all guest emails (instructor + student)
+      const guestList = [instructorEmail, studentEmail].filter(function(e) { return !!e; });
+      const guestsStr = guestList.join(",");
+
       // Search only on the same day — much faster than a full calendar scan
       const dayStart = new Date(lessonDate);
       dayStart.setHours(0, 0, 0, 0);
@@ -258,17 +265,17 @@ function syncToCalendar() {
         event.setTitle(title);
         event.setTime(lessonDate, endDate);
         event.setDescription(description);
-        // Add instructor as guest if not already present
-        if (instructorEmail) {
-          const guestEmails = event.getGuestList().map(function(g) { return g.getEmail(); });
-          if (guestEmails.indexOf(instructorEmail) === -1) {
-            event.addGuest(instructorEmail);
+        // Add instructor and student as guests if not already present
+        const existingGuestEmails = event.getGuestList().map(function(g) { return g.getEmail(); });
+        guestList.forEach(function(email) {
+          if (existingGuestEmails.indexOf(email) === -1) {
+            event.addGuest(email);
           }
-        }
+        });
         updated++;
       } else {
         const opts = { description: description };
-        if (instructorEmail) opts.guests = instructorEmail;
+        if (guestsStr) opts.guests = guestsStr;
         calendar.createEvent(title, lessonDate, endDate, opts);
         created++;
       }
@@ -280,7 +287,7 @@ function syncToCalendar() {
     "Created: " + created + " new lesson event(s)\\n" +
     "Updated: " + updated + " existing event(s)\\n\\n" +
     (created + updated > 0
-      ? "Instructors with email addresses in the sheet have been invited as calendar guests."
+      ? "Instructors and students with emails in the sheet have been invited as calendar guests."
       : "No scheduled lessons found.")
   );
 }
@@ -344,6 +351,193 @@ function syncEventsToCalendar() {
   ui.alert("Events calendar sync complete!\\n\\nCreated: " + created + "\\nUpdated: " + updated);
 }
 
+// ─── Monthly Calendar View ───────────────────────────────────────────────────
+
+/**
+ * Renders a visual monthly calendar in the "Monthly Calendar" sheet tab.
+ * Each day cell shows all lessons scheduled that day.
+ * Prompts for month and year, then rebuilds the grid.
+ */
+function renderMonthCalendar() {
+  const ui = SpreadsheetApp.getUi();
+  const now = new Date();
+
+  const monthRes = ui.prompt(
+    "Monthly Calendar",
+    "Enter month number (1–12):",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (monthRes.getSelectedButton() !== ui.Button.OK) return;
+
+  const yearRes = ui.prompt(
+    "Monthly Calendar",
+    "Enter year (e.g. " + now.getFullYear() + "):",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (yearRes.getSelectedButton() !== ui.Button.OK) return;
+
+  const month = parseInt(monthRes.getResponseText().trim(), 10);
+  const year = parseInt(yearRes.getResponseText().trim(), 10);
+
+  if (isNaN(month) || month < 1 || month > 12 || isNaN(year) || year < 2020) {
+    ui.alert("Invalid month or year. Please enter a month 1–12 and a 4-digit year.");
+    return;
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let calSheet = ss.getSheetByName("Monthly Calendar");
+  if (!calSheet) calSheet = ss.insertSheet("Monthly Calendar");
+
+  calSheet.clear();
+  calSheet.clearFormats();
+
+  // ── Gather lessons for this month ──────────────────────────────────────────
+
+  const rows = readSheetRows(MASTER_SHEET);
+  const lessonsByDay = {}; // "YYYY-MM-DD" → [{time, student, course, instructor}]
+
+  rows.forEach(function(row) {
+    const studentName = row.studentName || "Unknown";
+    const courseName  = row.courseName  || "Unknown";
+    const instrName   = row.instructorName || "";
+
+    for (var i = 1; i <= MAX_LESSONS; i++) {
+      const dtVal = row["lesson" + i + "DateTime"];
+      if (!dtVal) continue;
+      const dt = new Date(dtVal);
+      if (isNaN(dt.getTime())) continue;
+      if (dt.getFullYear() !== year || dt.getMonth() + 1 !== month) continue;
+
+      const dayKey = year + "-" +
+        String(month).padStart(2, "0") + "-" +
+        String(dt.getDate()).padStart(2, "0");
+
+      const h = dt.getHours(), m = dt.getMinutes();
+      const ampm = h >= 12 ? "PM" : "AM";
+      const h12 = h % 12 || 12;
+      const timeStr = h12 + ":" + String(m).padStart(2, "0") + " " + ampm;
+
+      if (!lessonsByDay[dayKey]) lessonsByDay[dayKey] = [];
+      lessonsByDay[dayKey].push({
+        time: timeStr,
+        student: studentName,
+        course: courseName,
+        instructor: instrName,
+      });
+    }
+  });
+
+  // Sort each day's lessons by time
+  Object.keys(lessonsByDay).forEach(function(k) {
+    lessonsByDay[k].sort(function(a, b) { return a.time < b.time ? -1 : 1; });
+  });
+
+  // ── Build week grid data ───────────────────────────────────────────────────
+
+  const MONTH_NAMES = ["January","February","March","April","May","June",
+                       "July","August","September","October","November","December"];
+  const DAY_NAMES   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const startDow    = new Date(year, month - 1, 1).getDay(); // 0=Sun
+
+  // Build weeks: each week is array of 7 {day, lessons} objects
+  const weeks = [];
+  let week = [];
+
+  // Leading empty days
+  for (var d = 0; d < startDow; d++) week.push({ day: 0, lessons: [] });
+
+  for (var day = 1; day <= daysInMonth; day++) {
+    const dayKey = year + "-" +
+      String(month).padStart(2, "0") + "-" +
+      String(day).padStart(2, "0");
+    week.push({ day: day, lessons: lessonsByDay[dayKey] || [] });
+    if (week.length === 7) { weeks.push(week); week = []; }
+  }
+  // Trailing empty days
+  while (week.length < 7 && week.length > 0) week.push({ day: 0, lessons: [] });
+  if (week.length > 0) weeks.push(week);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  // Title row (spans all 7 columns)
+  calSheet.getRange(1, 1, 1, 7).merge()
+    .setValue(MONTH_NAMES[month - 1] + " " + year + " — MUSE INC Schedule")
+    .setBackground("#1a2744").setFontColor("#ffffff")
+    .setFontWeight("bold").setFontSize(14)
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  calSheet.setRowHeight(1, 44);
+
+  // Day-of-week header row
+  for (var col = 0; col < 7; col++) {
+    calSheet.getRange(2, col + 1)
+      .setValue(DAY_NAMES[col])
+      .setBackground("#2c3e6b").setFontColor("#ffffff")
+      .setFontWeight("bold").setHorizontalAlignment("center").setVerticalAlignment("middle");
+  }
+  calSheet.setRowHeight(2, 28);
+
+  // Week rows
+  weeks.forEach(function(wk, wkIdx) {
+    const sheetRow = wkIdx + 3;
+
+    // Row height = tallest day in the week
+    const maxLessons = Math.max.apply(null, wk.map(function(d) { return d.lessons.length; }));
+    const rowH = Math.max(72, 36 + maxLessons * 22);
+    calSheet.setRowHeight(sheetRow, rowH);
+
+    wk.forEach(function(dayObj, colIdx) {
+      const cell = calSheet.getRange(sheetRow, colIdx + 1);
+
+      if (dayObj.day === 0) {
+        // Empty padding cell
+        cell.setBackground("#f0f0f0");
+        return;
+      }
+
+      const hasLessons = dayObj.lessons.length > 0;
+      const lines = [String(dayObj.day)];
+      dayObj.lessons.forEach(function(l) {
+        lines.push(l.time + "  " + l.student);
+        lines.push("  " + l.course + (l.instructor ? " · " + l.instructor : ""));
+      });
+
+      cell.setValue(lines.join("\\n"));
+      cell.setWrap(true).setVerticalAlignment("top");
+      cell.setBackground(hasLessons ? "#ddeeff" : "#ffffff");
+
+      // Bold the date number via RichTextValue
+      try {
+        const rt = SpreadsheetApp.newRichTextValue()
+          .setText(lines.join("\\n"))
+          .setTextStyle(0, String(dayObj.day).length,
+            SpreadsheetApp.newTextStyle().setBold(true).setFontSize(11).build())
+          .build();
+        cell.setRichTextValue(rt);
+      } catch(e) {
+        // RichText not supported in all contexts — plain text fallback already set
+      }
+
+      cell.setBorder(true, true, true, true, false, false,
+        "#cccccc", SpreadsheetApp.BorderStyle.SOLID);
+    });
+  });
+
+  // Column widths
+  for (var c = 1; c <= 7; c++) calSheet.setColumnWidth(c, 155);
+  calSheet.setFrozenRows(2);
+
+  // Bring the sheet to front
+  ss.setActiveSheet(calSheet);
+
+  ui.alert(
+    "Monthly Calendar refreshed!\\n\\n" +
+    MONTH_NAMES[month - 1] + " " + year + "\\n" +
+    "Days with lessons are highlighted blue.\\n\\n" +
+    "Run \\"View Monthly Calendar\\" again to switch month."
+  );
+}
+
 // ─── Sheet Helpers ───────────────────────────────────────────────────────────
 
 function buildEnrollmentHeaders() {
@@ -376,19 +570,47 @@ function buildEventHeaders() {
   return ["id", "title", "caption", "flyerUrl", "startAt", "endAt", "isActive"];
 }
 
+// Columns that should be displayed as human-readable date/time
+function isDateTimeHeader(h) {
+  return /^lesson\d+DateTime$/.test(h) || h === "startAt" || h === "endAt";
+}
+
 function writeSheetRows(sheetName, headers, rows) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) sheet = ss.insertSheet(sheetName);
 
+  // Find which column indices are date/time columns
+  const dateColIndices = [];
+  headers.forEach(function(h, idx) {
+    if (isDateTimeHeader(h)) dateColIndices.push(idx);
+  });
+
   const values = [headers];
   rows.forEach(function(row) {
-    values.push(headers.map(function(h) { return normalizeCell(row[h]); }));
+    values.push(headers.map(function(h, idx) {
+      const raw = row[h];
+      // Convert ISO strings in date columns to actual Date objects so Sheets
+      // stores them as date values (displayed in the sheet's local timezone)
+      if (dateColIndices.indexOf(idx) !== -1 && raw && typeof raw === "string") {
+        const d = new Date(raw);
+        if (!isNaN(d.getTime())) return d;
+      }
+      return normalizeCell(raw);
+    }));
   });
 
   sheet.clear();
   const numRows = values.length || 1;
   sheet.getRange(1, 1, numRows, headers.length).setValues(values.length ? values : [headers]);
+
+  // Format date/time columns as "M/d/yyyy h:mm am/pm" (Vietnam local time)
+  if (values.length > 1) {
+    dateColIndices.forEach(function(idx) {
+      sheet.getRange(2, idx + 1, values.length - 1, 1)
+        .setNumberFormat("d/M/yyyy h:mm am/pm");
+    });
+  }
 
   // Style the header row
   const headerRange = sheet.getRange(1, 1, 1, headers.length);
