@@ -178,33 +178,61 @@ function parseLessonNumber(value: unknown, fallback: number): number {
 // Vietnam timezone offset: UTC+7
 const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 
+function parseDateAsVietnam(
+  year: number, month: number, day: number,
+  hour: number, minute: number, second = 0
+): string {
+  // Convert Vietnam local time → UTC by subtracting VN offset
+  const utcMs = Date.UTC(year, month - 1, day, hour, minute, second) - VN_OFFSET_MS;
+  return new Date(utcMs).toISOString();
+}
+
 function normalizeDateToIso(value: unknown): string | null {
   if (!value) return null;
   const raw = value as any;
-  // If the value is a plain date string with no timezone info (e.g. "2026-03-20 10:00"
-  // or "3/20/2026 10:00"), treat it as Vietnam time (UTC+7).
+
   if (typeof raw === "string") {
-    const hasTimezone = /[Zz]|[+-]\d{2}:?\d{2}$/.test(raw.trim());
+    const str = raw.trim();
+    const hasTimezone = /[Zz]|[+-]\d{2}:?\d{2}$/.test(str);
+
     if (!hasTimezone) {
-      // Parse as local and offset to Vietnam
-      const local = new Date(raw);
+      // Vietnamese format: d/M/yyyy h:mm am/pm  (e.g. "17/4/2026 2:00 pm")
+      // or with 24h time:  d/M/yyyy H:mm         (e.g. "17/4/2026 14:00")
+      const vnMatch = str.match(
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i
+      );
+      if (vnMatch) {
+        const [, d, m, y, hr, min, sec, ampm] = vnMatch;
+        let hour = parseInt(hr, 10);
+        if (ampm) {
+          if (ampm.toLowerCase() === "pm" && hour < 12) hour += 12;
+          if (ampm.toLowerCase() === "am" && hour === 12) hour = 0;
+        }
+        return parseDateAsVietnam(
+          parseInt(y, 10), parseInt(m, 10), parseInt(d, 10),
+          hour, parseInt(min, 10), sec ? parseInt(sec, 10) : 0
+        );
+      }
+
+      // ISO-like without timezone: "2026-03-20 10:00" or "2026-03-20T10:00"
+      const local = new Date(str);
       if (Number.isNaN(local.getTime())) return null;
-      // Subtract server UTC offset, add Vietnam offset so the wall-clock time is preserved as VN
-      const serverOffsetMs = local.getTimezoneOffset() * 60 * 1000; // getTimezoneOffset is UTC - local
-      const utc = new Date(local.getTime() + serverOffsetMs - VN_OFFSET_MS);
-      return utc.toISOString();
+      // Server is UTC, so getTimezoneOffset() === 0; just subtract VN offset
+      const serverOffsetMs = local.getTimezoneOffset() * 60 * 1000;
+      return new Date(local.getTime() + serverOffsetMs - VN_OFFSET_MS).toISOString();
     }
   }
-  // Google Sheets serial numbers (numbers) — treat as VN midnight
+
+  // Google Sheets serial numbers — treat as VN midnight
   if (typeof raw === "number") {
-    // Sheets epoch: Dec 30, 1899; JS epoch: Jan 1, 1970
     const MS_PER_DAY = 86400000;
-    const SHEETS_EPOCH_OFFSET = 25569; // days from Sheets epoch to JS epoch
+    const SHEETS_EPOCH_OFFSET = 25569;
     const utcMs = (raw - SHEETS_EPOCH_OFFSET) * MS_PER_DAY - VN_OFFSET_MS;
     const date = new Date(utcMs);
     if (Number.isNaN(date.getTime())) return null;
     return date.toISOString();
   }
+
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
