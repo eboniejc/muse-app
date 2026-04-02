@@ -103,6 +103,19 @@ function pullFromApp() {
   }
 
   try {
+    // Snapshot existing sheet data BEFORE pulling so we can preserve manual entries
+    var existingByEnrollmentId = {};
+    try {
+      var existingRows = readSheetRows(MASTER_SHEET);
+      existingRows.forEach(function(row) {
+        if (row.enrollmentId) {
+          existingByEnrollmentId[String(row.enrollmentId)] = row;
+        }
+      });
+    } catch(e) {
+      // Sheet may not exist yet — that is fine
+    }
+
     const response = UrlFetchApp.fetch(\`\${appUrl}/_api/sheets/export\`, {
       method: "post",
       headers: { "x-api-key": apiKey },
@@ -117,10 +130,39 @@ function pullFromApp() {
     const enrollmentRows = parsed?.data?.flattenedEnrollments || [];
     const eventsRows = parsed?.data?.events || [];
 
-    writeSheetRows(MASTER_SHEET, buildEnrollmentHeaders(), enrollmentRows);
+    // Merge: preserve instructor columns and lesson dates from existing sheet
+    // when the server returns empty (e.g. instructor not yet linked in the app)
+    var PRESERVE_IF_EMPTY = ["instructorId", "instructorName", "instructorEmail"];
+    var mergedRows = enrollmentRows.map(function(row) {
+      var eid = String(row.enrollmentId || "");
+      var existing = existingByEnrollmentId[eid];
+      if (!existing) return row;
+
+      var merged = {};
+      Object.keys(row).forEach(function(k) { merged[k] = row[k]; });
+
+      // Keep manually-entered instructor info if server has none
+      PRESERVE_IF_EMPTY.forEach(function(field) {
+        if (!merged[field] && existing[field]) {
+          merged[field] = existing[field];
+        }
+      });
+
+      // Keep lesson dates from sheet if server has none for that slot
+      for (var i = 1; i <= MAX_LESSONS; i++) {
+        var key = "lesson" + i + "DateTime";
+        if (!merged[key] && existing[key]) {
+          merged[key] = existing[key];
+        }
+      }
+
+      return merged;
+    });
+
+    writeSheetRows(MASTER_SHEET, buildEnrollmentHeaders(), mergedRows);
     writeSheetRows(EVENTS_SHEET, buildEventHeaders(), eventsRows);
 
-    ui.alert("Pull complete: " + enrollmentRows.length + " enrollment row(s), " + eventsRows.length + " event(s)");
+    ui.alert("Pull complete: " + mergedRows.length + " enrollment row(s), " + eventsRows.length + " event(s)");
   } catch (error) {
     ui.alert("Pull failed: " + error.message);
   }
