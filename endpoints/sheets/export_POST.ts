@@ -180,7 +180,11 @@ function buildFlattenedEnrollments(input: {
     }
   }
 
-  return (courseEnrollments ?? []).map((enrollment: any) => {
+  const sortedEnrollments = [...(courseEnrollments ?? [])].sort(
+    (a, b) => Number(readField(a, "id")) - Number(readField(b, "id"))
+  );
+
+  return sortedEnrollments.map((enrollment: any) => {
     const enrollmentId = readField<string | number>(enrollment, "id");
     const userId = readField<string | number>(enrollment, "userId", "user_id");
     const courseId = readField<string | number>(enrollment, "courseId", "course_id");
