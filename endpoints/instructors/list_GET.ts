@@ -12,35 +12,37 @@ export async function handle(request: Request) {
       .where("role", "=", "instructor")
       .execute();
 
-    const formattedInstructors = instructors.map((inst) => ({
-      id: inst.id,
-      displayName:
-        (inst as any).displayName ??
-        (inst as any).displayname ??
-        (inst as any).display_name ??
-        "",
-      email: inst.email,
-      avatarUrl:
-        (inst as any).avatarUrl ??
-        (inst as any).avatarurl ??
-        (inst as any).avatar_url ??
-        null,
-      whatsappNumber:
+    const formattedInstructors = instructors.map((inst) => {
+      const rawPhone: string | null =
         (inst as any).whatsappNumber ??
         (inst as any).whatsappnumber ??
         (inst as any).whatsapp_number ??
-        null,
-      whatsappLink:
-        ((inst as any).whatsappNumber ??
-          (inst as any).whatsappnumber ??
-          (inst as any).whatsapp_number)
-          ? `https://wa.me/${String(
-              (inst as any).whatsappNumber ??
-                (inst as any).whatsappnumber ??
-                (inst as any).whatsapp_number
-            ).replace(/[^0-9]/g, "")}`
-        : null,
-    }));
+        null;
+      const digitsOnly = rawPhone ? rawPhone.replace(/[^0-9]/g, "") : null;
+      // Zalo uses Vietnamese local format: remove leading country code 84, add 0
+      const zaloLocal = digitsOnly
+        ? digitsOnly.startsWith("84")
+          ? "0" + digitsOnly.slice(2)
+          : digitsOnly
+        : null;
+      return {
+        id: inst.id,
+        displayName:
+          (inst as any).displayName ??
+          (inst as any).displayname ??
+          (inst as any).display_name ??
+          "",
+        email: inst.email,
+        avatarUrl:
+          (inst as any).avatarUrl ??
+          (inst as any).avatarurl ??
+          (inst as any).avatar_url ??
+          null,
+        whatsappNumber: rawPhone,
+        whatsappLink: digitsOnly ? `https://wa.me/${digitsOnly}` : null,
+        zaloLink: zaloLocal ? `https://zalo.me/${zaloLocal}` : null,
+      };
+    });
 
     return new Response(
       superjson.stringify({

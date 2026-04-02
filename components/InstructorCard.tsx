@@ -18,9 +18,8 @@ export const InstructorCard: React.FC<InstructorCardProps> = ({ instructor }) =>
     .toUpperCase()
     .slice(0, 2);
 
-  const whatsappUrl = instructor.whatsappNumber
-    ? `https://wa.me/${instructor.whatsappNumber.replace(/\D/g, "")}`
-    : null;
+  const whatsappUrl = instructor.whatsappLink ?? null;
+  const zaloUrl = instructor.zaloLink ?? null;
 
   return (
     <div className={styles.card}>
@@ -34,17 +33,31 @@ export const InstructorCard: React.FC<InstructorCardProps> = ({ instructor }) =>
           <Badge variant="secondary" className={styles.badge}>Instructor</Badge>
         </div>
       </div>
-      
-            <div className={styles.actions}>
-        {whatsappUrl ? (
-          <Button 
-            className={styles.whatsappButton}
-            size="sm"
-            onClick={() => (window.top || window).open(whatsappUrl, "_blank")}
-          >
-              <MessageCircle size={16} />
-              Chat on WhatsApp
-          </Button>
+
+      <div className={styles.actions}>
+        {whatsappUrl || zaloUrl ? (
+          <div className={styles.buttonRow}>
+            {whatsappUrl && (
+              <Button
+                className={styles.whatsappButton}
+                size="sm"
+                onClick={() => (window.top || window).open(whatsappUrl, "_blank")}
+              >
+                <MessageCircle size={16} />
+                WhatsApp
+              </Button>
+            )}
+            {zaloUrl && (
+              <Button
+                className={styles.zaloButton}
+                size="sm"
+                onClick={() => (window.top || window).open(zaloUrl, "_blank")}
+              >
+                <MessageCircle size={16} />
+                Zalo
+              </Button>
+            )}
+          </div>
         ) : (
           <Button disabled size="sm" variant="outline" className={styles.disabledButton}>
             <MessageCircle size={16} />

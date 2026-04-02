@@ -20,6 +20,7 @@ export default function InstructorsPage() {
       avatarUrl: null,
       whatsappNumber: "+84902957911",
       whatsappLink: "https://wa.me/84902957911",
+      zaloLink: "https://zalo.me/0902957911",
     },
     {
       id: -2,
@@ -28,6 +29,7 @@ export default function InstructorsPage() {
       avatarUrl: null,
       whatsappNumber: "+84932484884",
       whatsappLink: "https://wa.me/84932484884",
+      zaloLink: "https://zalo.me/0932484884",
     },
     {
       id: -3,
@@ -36,6 +38,7 @@ export default function InstructorsPage() {
       avatarUrl: null,
       whatsappNumber: "+84909515597",
       whatsappLink: "https://wa.me/84909515597",
+      zaloLink: "https://zalo.me/0909515597",
     },
     {
       id: -4,
@@ -44,6 +47,7 @@ export default function InstructorsPage() {
       avatarUrl: null,
       whatsappNumber: "+84932222292",
       whatsappLink: "https://wa.me/84932222292",
+      zaloLink: "https://zalo.me/0932222292",
     },
   ];
 
