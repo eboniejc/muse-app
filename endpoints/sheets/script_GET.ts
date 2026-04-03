@@ -159,10 +159,15 @@ function pullFromApp() {
       return merged;
     });
 
+    const cancellationRows = parsed?.data?.lessonCancellations || [];
+
     writeSheetRows(MASTER_SHEET, buildEnrollmentHeaders(), mergedRows);
     writeSheetRows(EVENTS_SHEET, buildEventHeaders(), eventsRows);
+    if (cancellationRows.length > 0) {
+      writeSheetRows("Cancellations", buildCancellationHeaders(), cancellationRows);
+    }
 
-    ui.alert("Pull complete: " + mergedRows.length + " enrollment row(s), " + eventsRows.length + " event(s)");
+    ui.alert("Pull complete: " + mergedRows.length + " enrollment row(s), " + eventsRows.length + " event(s)" + (cancellationRows.length > 0 ? ", " + cancellationRows.length + " cancellation(s)" : ""));
   } catch (error) {
     ui.alert("Pull failed: " + error.message);
   }
@@ -242,6 +247,8 @@ function syncToCalendar() {
   const ui = SpreadsheetApp.getUi();
   const props = PropertiesService.getScriptProperties();
   const calendarId = props.getProperty("CALENDAR_ID");
+  const appUrl = props.getProperty("APP_URL") || "";
+  const apiKey = props.getProperty("API_KEY") || "";
 
   if (!calendarId) {
     ui.alert('Please run "Setup Google Calendar" first.');
@@ -279,12 +286,23 @@ function syncToCalendar() {
       const uniqueTag = "[muse:" + enrollmentId + ":" + i + "]";
       const title = courseName + " — Lesson " + i + " | " + studentName;
 
+      // Cancel link — signed with HMAC so only valid for this lesson
+      var cancelLink = (appUrl && apiKey)
+        ? makeCancelLink(appUrl, apiKey, enrollmentId, i)
+        : "";
+
       const descLines = [
         "Student: " + studentName,
         "Course: " + courseName,
         "Lesson: " + i,
       ];
       if (instructorName) descLines.push("Instructor: " + instructorName);
+      if (cancelLink) {
+        descLines.push("");
+        descLines.push("Need to cancel? Click the link below (>24h: auto-approved | <24h: late cancel fee may apply):");
+        descLines.push(cancelLink);
+      }
+      descLines.push("");
       descLines.push(uniqueTag);
       const description = descLines.join("\\n");
 
@@ -580,7 +598,32 @@ function renderMonthCalendar() {
   );
 }
 
+// ─── Cancel Link Helpers ──────────────────────────────────────────────────────
+
+/**
+ * Generates a signed cancellation URL for a specific lesson.
+ * Uses HMAC-SHA256 with the stored API key as the secret —
+ * the same key already stored in script properties.
+ */
+function makeCancelLink(appUrl, apiKey, enrollmentId, lessonNumber) {
+  var message = enrollmentId + ":" + lessonNumber;
+  var keyBytes = Utilities.newBlob(apiKey).getBytes();
+  var msgBytes = Utilities.newBlob(message).getBytes();
+  var hmacBytes = Utilities.computeHmacSha256Signature(msgBytes, keyBytes);
+  var sig = hmacBytes.map(function(b) {
+    return ("0" + (b < 0 ? b + 256 : b).toString(16)).slice(-2);
+  }).join("");
+  return appUrl + "/_api/lessons/cancel?e=" + enrollmentId + "&l=" + lessonNumber + "&sig=" + sig;
+}
+
 // ─── Sheet Helpers ───────────────────────────────────────────────────────────
+
+function buildCancellationHeaders() {
+  return [
+    "enrollmentId", "lessonNumber", "studentName", "studentEmail",
+    "courseName", "scheduledAt", "cancelledAt", "hoursNotice", "isLate"
+  ];
+}
 
 function buildEnrollmentHeaders() {
   const headers = [
@@ -614,7 +657,7 @@ function buildEventHeaders() {
 
 // Columns that should be displayed as human-readable date/time
 function isDateTimeHeader(h) {
-  return /^lesson\d+DateTime$/.test(h) || h === "startAt" || h === "endAt";
+  return /^lesson\d+DateTime$/.test(h) || h === "startAt" || h === "endAt" || h === "scheduledAt" || h === "cancelledAt";
 }
 
 function writeSheetRows(sheetName, headers, rows) {

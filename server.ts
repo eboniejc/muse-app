@@ -398,6 +398,20 @@ app.get('_api/sheets/script',async c => {
     return c.text("Error loading endpoint code " + e.message,  500)
   }
 })
+app.get('_api/lessons/cancel',async c => {
+  try {
+    const { handle } = await importEndpoint("./endpoints/lessons/cancel_GET");
+    let request = c.req.raw;
+    const response = await handle(request);
+    if (!(response instanceof Response) && response.constructor.name !== "Response") {
+      return c.text("Invalid response format. handle should always return a Response object." + response.constructor.name, 500);
+    }
+    return response;
+  } catch (e) {
+    console.error(e);
+    return c.text("Error loading endpoint code " + e.message,  500)
+  }
+})
 app.get('_api/lessons/upcoming',async c => {
   try {
     const { handle } = await importEndpoint("./endpoints/lessons/upcoming_GET");

@@ -252,6 +252,7 @@ export async function handle(request: Request) {
       events,
       users,
       userProfiles,
+      lessonCancellations,
     ] = await Promise.all([
       safeSelectCourses(),
       safeSelectEbooks(),
@@ -263,6 +264,7 @@ export async function handle(request: Request) {
       safeSelectEvents(),
       safeSelectUsers(),
       safeSelectUserProfiles(),
+      safeSelectAll("lessonCancellations"),
     ]);
 
     const flattenedEnrollments = buildFlattenedEnrollments({
@@ -403,6 +405,9 @@ export async function handle(request: Request) {
       users,
       userProfiles,
       flattenedEnrollments,
+      lessonCancellations: (lessonCancellations ?? []).sort(
+        (a: any, b: any) => new Date(b.cancelledAt ?? 0).getTime() - new Date(a.cancelledAt ?? 0).getTime()
+      ),
     };
 
     return new Response(
