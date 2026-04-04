@@ -27,6 +27,7 @@ function onOpen() {
     .addItem("Sync Events to Google Calendar", "syncEventsToCalendar")
     .addSeparator()
     .addItem("View Monthly Calendar", "renderMonthCalendar")
+    .addItem("View Instructor Audit", "renderAuditSheet")
     .addToUi();
 }
 
@@ -148,12 +149,15 @@ function pullFromApp() {
         }
       });
 
-      // Keep lesson dates from sheet if server has none for that slot
+      // Keep lesson dates, instructor, and status from sheet if server has none for that slot
       for (var i = 1; i <= MAX_LESSONS; i++) {
-        var key = "lesson" + i + "DateTime";
-        if (!merged[key] && existing[key]) {
-          merged[key] = existing[key];
-        }
+        var dtKey = "lesson" + i + "DateTime";
+        var instrKey = "lesson" + i + "Instructor";
+        var statusKey = "lesson" + i + "Status";
+        if (!merged[dtKey] && existing[dtKey]) merged[dtKey] = existing[dtKey];
+        if (!merged[instrKey] && existing[instrKey]) merged[instrKey] = existing[instrKey];
+        // Status: server value always wins (it's computed from DB); only fall back if server sends nothing
+        if (!merged[statusKey] && existing[statusKey]) merged[statusKey] = existing[statusKey];
       }
 
       return merged;
@@ -411,6 +415,140 @@ function syncEventsToCalendar() {
   ui.alert("Events calendar sync complete!\\n\\nCreated: " + created + "\\nUpdated: " + updated);
 }
 
+// ─── Instructor Audit ────────────────────────────────────────────────────────
+
+/**
+ * Builds an Audit worksheet showing how many lessons each instructor taught
+ * within a user-entered date range, with a full lesson-by-lesson detail section.
+ */
+function renderAuditSheet() {
+  const ui = SpreadsheetApp.getUi();
+
+  const startRes = ui.prompt("Instructor Audit", "Start date (DD/MM/YYYY):", ui.ButtonSet.OK_CANCEL);
+  if (startRes.getSelectedButton() !== ui.Button.OK) return;
+
+  const endRes = ui.prompt("Instructor Audit", "End date (DD/MM/YYYY):", ui.ButtonSet.OK_CANCEL);
+  if (endRes.getSelectedButton() !== ui.Button.OK) return;
+
+  function parseVNDate(str) {
+    var parts = str.trim().split("/");
+    if (parts.length !== 3) return null;
+    return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+  }
+
+  var startDate = parseVNDate(startRes.getResponseText());
+  var endDate = parseVNDate(endRes.getResponseText());
+
+  if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    ui.alert("Invalid dates. Please use DD/MM/YYYY format (e.g. 01/04/2026).");
+    return;
+  }
+  endDate.setHours(23, 59, 59, 999);
+
+  var rows = readSheetRows(MASTER_SHEET);
+
+  // { instructorName: [{student, course, lessonNum, date, enrollmentId}] }
+  var instructorLessons = {};
+
+  rows.forEach(function(row) {
+    for (var i = 1; i <= MAX_LESSONS; i++) {
+      var dateVal = row["lesson" + i + "DateTime"];
+      var status = (row["lesson" + i + "Status"] || "").trim().toLowerCase();
+      // Per-lesson instructor takes priority; fall back to course-level instructor
+      var instrName = (row["lesson" + i + "Instructor"] || row.instructorName || "").trim();
+      if (!dateVal || !instrName) continue;
+      if (status === "cancelled") continue; // skip cancelled lessons
+
+      var lessonDate = new Date(dateVal);
+      if (isNaN(lessonDate.getTime())) continue;
+      if (lessonDate < startDate || lessonDate > endDate) continue;
+
+      if (!instructorLessons[instrName]) instructorLessons[instrName] = [];
+      instructorLessons[instrName].push({
+        student: row.studentName || "",
+        course: row.courseName || "",
+        lessonNum: i,
+        date: lessonDate,
+      });
+    }
+  });
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var auditSheet = ss.getSheetByName("Audit");
+  if (!auditSheet) auditSheet = ss.insertSheet("Audit");
+  auditSheet.clear();
+  auditSheet.clearFormats();
+
+  var startStr = startRes.getResponseText().trim();
+  var endStr = endRes.getResponseText().trim();
+  var instructorNames = Object.keys(instructorLessons).sort();
+  var totalLessons = instructorNames.reduce(function(s, n) { return s + instructorLessons[n].length; }, 0);
+
+  // ── Title ────────────────────────────────────────────────────────────────
+  auditSheet.getRange(1, 1, 1, 5).merge()
+    .setValue("MUSE INC — Instructor Audit: " + startStr + " to " + endStr)
+    .setBackground("#1a2744").setFontColor("#ffffff")
+    .setFontWeight("bold").setFontSize(14)
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  auditSheet.setRowHeight(1, 44);
+
+  // ── Summary table ────────────────────────────────────────────────────────
+  var r = 3;
+  auditSheet.getRange(r, 1, 1, 3).setValues([["Instructor", "Lessons Taught", "Period"]])
+    .setFontWeight("bold").setBackground("#2c3e6b").setFontColor("#ffffff");
+  auditSheet.setRowHeight(r, 28);
+  r++;
+
+  if (instructorNames.length === 0) {
+    auditSheet.getRange(r, 1).setValue("No lessons found in this period.");
+    r++;
+  } else {
+    instructorNames.forEach(function(name) {
+      auditSheet.getRange(r, 1, 1, 3).setValues([[name, instructorLessons[name].length, startStr + " — " + endStr]]);
+      r++;
+    });
+    // Totals row
+    auditSheet.getRange(r, 1, 1, 2).setValues([["TOTAL", totalLessons]])
+      .setFontWeight("bold").setBackground("#e8f4fd");
+    r++;
+  }
+
+  r += 2;
+
+  // ── Detail table ─────────────────────────────────────────────────────────
+  auditSheet.getRange(r, 1, 1, 5).setValues([["Instructor", "Student", "Course", "Lesson #", "Date & Time"]])
+    .setFontWeight("bold").setBackground("#2c3e6b").setFontColor("#ffffff");
+  auditSheet.setRowHeight(r, 28);
+  r++;
+
+  instructorNames.forEach(function(name) {
+    var lessons = instructorLessons[name].slice().sort(function(a, b) { return a.date - b.date; });
+    var groupStart = r;
+
+    lessons.forEach(function(l) {
+      auditSheet.getRange(r, 1, 1, 5).setValues([[name, l.student, l.course, "Lesson " + l.lessonNum, l.date]]);
+      auditSheet.getRange(r, 5).setNumberFormat("d/M/yyyy h:mm am/pm");
+      r++;
+    });
+
+    // Instructor subtotal
+    auditSheet.getRange(r, 1, 1, 2).setValues([["Subtotal: " + name, lessons.length]])
+      .setFontWeight("bold").setBackground("#e8f4fd");
+    r++;
+  });
+
+  auditSheet.autoResizeColumns(1, 5);
+  auditSheet.setFrozenRows(1);
+  ss.setActiveSheet(auditSheet);
+
+  ui.alert(
+    "Audit complete!\\n\\n" +
+    "Period: " + startStr + " — " + endStr + "\\n" +
+    "Total lessons: " + totalLessons + "\\n" +
+    "Instructors: " + instructorNames.join(", ")
+  );
+}
+
 // ─── Monthly Calendar View ───────────────────────────────────────────────────
 
 /**
@@ -644,8 +782,8 @@ function buildEnrollmentHeaders() {
 
   for (var i = 1; i <= MAX_LESSONS; i++) {
     headers.push("lesson" + i + "DateTime");
-    headers.push("lesson" + i + "Ebook");
-    headers.push("lesson" + i + "EbookUnlocked");
+    headers.push("lesson" + i + "Instructor");
+    headers.push("lesson" + i + "Status");
   }
 
   return headers;

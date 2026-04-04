@@ -25,7 +25,7 @@ export default function InstructorsPage() {
     {
       id: -2,
       displayName: "DJ Napple",
-      email: "",
+      email: "djnapple@gmail.com",
       avatarUrl: null,
       whatsappNumber: "+84932484884",
       whatsappLink: "https://wa.me/84932484884",
@@ -34,7 +34,7 @@ export default function InstructorsPage() {
     {
       id: -3,
       displayName: "DJ Zackie",
-      email: "",
+      email: "thienga1110@gmail.com",
       avatarUrl: null,
       whatsappNumber: "+84909515597",
       whatsappLink: "https://wa.me/84909515597",
@@ -43,11 +43,20 @@ export default function InstructorsPage() {
     {
       id: -4,
       displayName: "DJ Zbuzh",
-      email: "",
+      email: "Djzbuzhh1304@gmail.com",
       avatarUrl: null,
       whatsappNumber: "+84932222292",
       whatsappLink: "https://wa.me/84932222292",
       zaloLink: "https://zalo.me/0932222292",
+    },
+    {
+      id: -5,
+      displayName: "Jake",
+      email: "dj.jakeryan95@gmail.com",
+      avatarUrl: null,
+      whatsappNumber: null,
+      whatsappLink: null,
+      zaloLink: null,
     },
   ];
 

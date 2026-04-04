@@ -138,10 +138,18 @@ function buildFlattenedEnrollments(input: {
   ebooks: any[];
   users: any[];
   userProfiles: any[];
+  lessonCancellations: any[];
 }): Record<string, unknown>[] {
-  const { courses, courseEnrollments, lessonSchedules, ebooks, users, userProfiles } = input;
+  const { courses, courseEnrollments, lessonSchedules, ebooks, users, userProfiles, lessonCancellations } = input;
   const nowMs = Date.now();
   const oneHourMs = 60 * 60 * 1000;
+
+  const cancelledSet = new Set<string>();
+  for (const row of lessonCancellations ?? []) {
+    const eid = readField<string | number>(row, "enrollmentId");
+    const ln = readField<string | number>(row, "lessonNumber");
+    if (eid && ln) cancelledSet.add(`${eid}-${ln}`);
+  }
 
   const courseById = new Map(
     (courses ?? []).map((row: any) => [String(readField(row, "id")), row])
@@ -223,7 +231,17 @@ function buildFlattenedEnrollments(input: {
       const scheduledAt = readField<string | null>(schedule ?? {}, "scheduledAt", "scheduled_at") ?? null;
       const scheduledMs = scheduledAt ? new Date(scheduledAt).getTime() : NaN;
 
+      const isCancelled = cancelledSet.has(`${enrollmentId}-${i}`);
+      let lessonStatus = "";
+      if (isCancelled) {
+        lessonStatus = "cancelled";
+      } else if (Number.isFinite(scheduledMs) && scheduledMs < nowMs) {
+        lessonStatus = "completed";
+      }
+
       row[`lesson${i}DateTime`] = scheduledAt;
+      row[`lesson${i}Instructor`] = readField(instructor ?? {}, "displayName", "displayname") ?? "";
+      row[`lesson${i}Status`] = lessonStatus;
       row[`lesson${i}Ebook`] = readField(ebook ?? {}, "title") ?? "";
       row[`lesson${i}EbookUnlocked`] =
         Number.isFinite(scheduledMs) && scheduledMs + oneHourMs <= nowMs;
@@ -274,6 +292,7 @@ export async function handle(request: Request) {
       ebooks,
       users,
       userProfiles,
+      lessonCancellations,
     });
 
     const exportData = {
