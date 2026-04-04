@@ -149,12 +149,16 @@ function pullFromApp() {
         }
       });
 
-      // Keep lesson dates, instructor, and status from sheet if server has none for that slot
+      // Dates: sheet is always the source of truth for existing rows.
+      // If the user deleted a date (cell is null/empty), that deletion is respected —
+      // the server value is NOT restored. Only new rows (not yet in the sheet) get
+      // their dates filled from the server.
       for (var i = 1; i <= MAX_LESSONS; i++) {
         var dtKey = "lesson" + i + "DateTime";
         var instrKey = "lesson" + i + "Instructor";
         var statusKey = "lesson" + i + "Status";
-        if (!merged[dtKey] && existing[dtKey]) merged[dtKey] = existing[dtKey];
+        // Use sheet value if the key exists (null = deliberately deleted)
+        if (dtKey in existing) merged[dtKey] = existing[dtKey];
         if (!merged[instrKey] && existing[instrKey]) merged[instrKey] = existing[instrKey];
         // Status: server value always wins (it's computed from DB); only fall back if server sends nothing
         if (!merged[statusKey] && existing[statusKey]) merged[statusKey] = existing[statusKey];
