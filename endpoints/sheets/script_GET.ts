@@ -31,6 +31,44 @@ function onOpen() {
     .addToUi();
 }
 
+// ─── onEdit trigger ──────────────────────────────────────────────────────────
+
+/**
+ * Automatically fills all lessonNInstructor columns when instructorEmail is
+ * set or changed on a MasterEnrollments row.
+ *
+ * Column layout (1-indexed):
+ *   11 = instructorName  |  12 = instructorEmail
+ *   14 = lesson1Instructor, 17 = lesson2Instructor, ... (+3 per lesson)
+ *
+ * Cells that already have a per-lesson override are left untouched.
+ * To force-overwrite all, clear the lessonNInstructor cells first, then
+ * re-enter the instructorEmail.
+ */
+function onEdit(e) {
+  var range = e.range;
+  var sheet = range.getSheet();
+  if (sheet.getName() !== MASTER_SHEET) return;
+
+  var col = range.getColumn();
+  var row = range.getRow();
+
+  // React only to instructorEmail column (col 12) and not the header row
+  if (col !== 12 || row < 2) return;
+
+  // Read instructorName from col 11 on the same row
+  var instructorName = sheet.getRange(row, 11).getValue();
+
+  // Fill empty lessonNInstructor cells: col 14, 17, 20 ... (14 + i*3)
+  for (var i = 0; i < MAX_LESSONS; i++) {
+    var instrCol = 14 + (i * 3);
+    var cell = sheet.getRange(row, instrCol);
+    if (!cell.getValue()) {
+      cell.setValue(instructorName);
+    }
+  }
+}
+
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
 function setup() {
