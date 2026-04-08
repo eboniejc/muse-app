@@ -53,7 +53,7 @@ export const PasswordRegisterForm: React.FC<PasswordRegisterFormProps> = ({
       const result = await postRegister(data);
       console.log("Registration successful for:", data.email);
       onLogin(result.user);
-      navigate("/complete-registration");
+      navigate("/dashboard");
     } catch (err) {
       console.error("Registration error:", err);
 
