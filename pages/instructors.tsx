@@ -54,9 +54,9 @@ export default function InstructorsPage() {
       displayName: "Jake",
       email: "dj.jakeryan95@gmail.com",
       avatarUrl: null,
-      whatsappNumber: null,
-      whatsappLink: null,
-      zaloLink: null,
+      whatsappNumber: "+84338997839",
+      whatsappLink: "https://wa.me/84338997839",
+      zaloLink: "https://zalo.me/0338997839",
     },
   ];
 

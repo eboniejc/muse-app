@@ -1,6 +1,6 @@
 import React from "react";
-import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../helpers/useAuth";
 import { useUpcomingLessons } from "../helpers/useUpcomingLessons";
@@ -66,9 +66,6 @@ export default function DashboardPage() {
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>{t('dashboard.upcomingSessions')}</h2>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/schedule">{t('schedule.title')} <ArrowRight size={16} /></Link>
-            </Button>
           </div>
           
           <div className={styles.list}>
