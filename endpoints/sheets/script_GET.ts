@@ -84,8 +84,90 @@ function setupSheets() {
 
   _instructMaster(ss);
   _instructEvents(ss);
+  cleanEventsSheet(ss);
 
   Logger.log('Sheets rebuilt OK. Calendar and Audit are clean with control cells in B2 and D2.');
+}
+
+// ── Clean Events Sheet ────────────────────────────────────────────────────────
+
+function cleanEventsSheet(ss) {
+  var sheet = ss.getSheetByName(EVENTS_SHEET);
+  if (!sheet) return;
+
+  var HEADERS = ['id','title','caption','flyerUrl','startAt','endAt','isActive'];
+  var lastCol = sheet.getLastColumn();
+
+  // Read existing data so we can rewrite cleanly
+  var existingData = sheet.getDataRange().getValues();
+  var existingHeaders = existingData.length > 0 ? existingData[0].map(String) : [];
+
+  // Remap rows to the correct 7-column order
+  var cleanRows = [];
+  for (var i = 1; i < existingData.length; i++) {
+    var row = existingData[i];
+    var hasData = row.some(function(v) { return v !== '' && v !== null && v !== undefined; });
+    if (!hasData) continue;
+    cleanRows.push(HEADERS.map(function(h) {
+      var idx = existingHeaders.indexOf(h);
+      return idx >= 0 ? row[idx] : '';
+    }));
+  }
+
+  // Clear the whole sheet and rewrite with exactly 7 columns
+  sheet.clear();
+  var numRows = cleanRows.length + 1;
+  var values = [HEADERS].concat(cleanRows);
+  sheet.getRange(1, 1, numRows, 7).setValues(values);
+
+  // Delete any phantom columns beyond col 7
+  var newLastCol = sheet.getLastColumn();
+  if (newLastCol > 7) sheet.deleteColumns(8, newLastCol - 7);
+
+  // Header row formatting
+  sheet.getRange(1, 1, 1, 7)
+    .setFontWeight('bold')
+    .setBackground(C.navy)
+    .setFontColor(C.white);
+
+  // Header notes
+  var notes = [
+    'EN: Unique event ID (auto-set by app, do not edit)\\nVI: ID su kien (tu dong, khong chinh sua)',
+    'EN: Event title\\nVI: Ten su kien',
+    'EN: Short description shown on event card\\nVI: Mo ta ngan hien thi tren the su kien',
+    'EN: Full image URL (https://...)\\nVI: Link anh day du (https://...)',
+    'EN: Start date/time — format: dd/mm/yy h:mmam/pm e.g. 25/04/26 07:00pm\\nVI: Ngay gio bat dau — dinh dang: dd/mm/yy h:mmam/pm vd: 25/04/26 07:00pm',
+    'EN: End date/time — leave blank for 2hr default\\nVI: Ngay gio ket thuc — de trong = mac dinh 2 gio',
+    'EN: TRUE = visible on app | FALSE = hidden\\nVI: TRUE = hien thi | FALSE = an di'
+  ];
+  for (var c = 0; c < 7; c++) {
+    sheet.getRange(1, c + 1).setNote(notes[c]);
+  }
+
+  // Date format for startAt (col 5) and endAt (col 6)
+  if (cleanRows.length > 0) {
+    sheet.getRange(2, 5, cleanRows.length, 1).setNumberFormat('dd/mm/yy h:mm am/pm');
+    sheet.getRange(2, 6, cleanRows.length, 1).setNumberFormat('dd/mm/yy h:mm am/pm');
+
+    // TRUE/FALSE dropdown for isActive (col 7)
+    var isActiveRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['TRUE','FALSE'], true)
+      .setHelpText('EN: TRUE = show event | FALSE = hide event\\nVI: TRUE = hien thi | FALSE = an su kien')
+      .build();
+    sheet.getRange(2, 7, cleanRows.length, 1).setDataValidation(isActiveRule);
+  }
+
+  // Column widths
+  sheet.setColumnWidth(1, 60);   // id
+  sheet.setColumnWidth(2, 200);  // title
+  sheet.setColumnWidth(3, 250);  // caption
+  sheet.setColumnWidth(4, 300);  // flyerUrl
+  sheet.setColumnWidth(5, 160);  // startAt
+  sheet.setColumnWidth(6, 160);  // endAt
+  sheet.setColumnWidth(7, 80);   // isActive
+
+  sheet.setFrozenRows(1);
+  Logger.log('cleanEventsSheet: Events sheet cleaned — ' + cleanRows.length + ' rows, 7 columns.');
 }
 
 // ── Menu ──────────────────────────────────────────────────────────────────────
@@ -554,6 +636,7 @@ function pullFromApp() {
 
     writeSheetRows(MASTER_SHEET, buildEnrollmentHeaders(), merged);
     writeSheetRows(EVENTS_SHEET, buildEventHeaders(), events);
+    cleanEventsSheet(SpreadsheetApp.getActiveSpreadsheet());
     if (cancellations.length) writeSheetRows('Cancellations', buildCancellationHeaders(), cancellations);
 
     ui.alert('Pull complete / Hoan tat',
