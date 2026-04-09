@@ -711,7 +711,7 @@ function syncToCalendar() {
       if (lessonInstr) lines.push('Instructor: '+lessonInstr);
       if (cancelUrl) lines.push('', 'Cancel: '+cancelUrl);
       lines.push('', tag);
-      var guests = [iEmail, sEmail].filter(Boolean);
+      var guests = [iEmail, sEmail, 'museincproperty@gmail.com'].filter(Boolean);
       var ds = new Date(start); ds.setHours(0,0,0,0);
       var de = new Date(start); de.setHours(23,59,59,999);
       var existing = calendar.getEvents(ds, de).filter(function(ev) { return ev.getDescription().indexOf(tag) !== -1; });
