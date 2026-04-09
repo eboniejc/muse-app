@@ -26,7 +26,7 @@ var MASTER_SHEET    = 'MasterEnrollments';
 var EVENTS_SHEET    = 'Events';
 var CAL_SHEET       = 'Monthly Calendar';
 var AUDIT_SHEET     = 'Audit';
-var MAX_LESSONS     = 16;
+var MAX_LESSONS     = 33;
 var CALENDAR_NAME   = 'MUSE INC Schedule';
 var LESSON_DURATION = 1; // hours
 
