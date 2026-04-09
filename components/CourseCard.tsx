@@ -28,6 +28,14 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
 
   return (
     <div className={styles.card}>
+      {course.coverImageUrl && (
+        <img
+          src={course.coverImageUrl}
+          alt={course.name}
+          className={styles.coverImage}
+          loading="lazy"
+        />
+      )}
       <div className={styles.header}>
         <div className={styles.badges}>
           <Badge variant="secondary">{course.skillLevel}</Badge>

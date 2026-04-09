@@ -19,13 +19,13 @@ export async function handle(request: Request) {
     // Retry with alternate user avatar column names for schema compatibility.
     let { data: courses, error: coursesErr } = await supabaseAdmin
       .from('courses')
-      .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,users(displayname,avatarUrl)')
+      .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,coverImageUrl,users(displayname,avatarUrl)')
       .eq('isActive', true);
 
     if (coursesErr?.code === "42703") {
       const retry = await supabaseAdmin
         .from('courses')
-        .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,users(displayname,avatarurl)')
+        .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,coverImageUrl,users(displayname,avatarurl)')
         .eq('isActive', true);
       courses = retry.data;
       coursesErr = retry.error;
@@ -34,7 +34,7 @@ export async function handle(request: Request) {
     if (coursesErr?.code === "42703") {
       const retry = await supabaseAdmin
         .from('courses')
-        .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,users(displayname)')
+        .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,coverImageUrl,users(displayname)')
         .eq('isActive', true);
       courses = retry.data;
       coursesErr = retry.error;
@@ -87,6 +87,7 @@ export async function handle(request: Request) {
       instructorName: course.users?.displayname || null,
       instructorAvatar: course.users?.avatarUrl || course.users?.avatarurl || null,
       enrolledCount: countMap.get(course.id) || 0,
+      coverImageUrl: course.coverImageUrl || null,
     }));
 
     // Defensive dedupe: if duplicate active rows exist for the same course name,
