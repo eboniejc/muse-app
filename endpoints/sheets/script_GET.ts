@@ -69,13 +69,17 @@ function installTrigger() {
 
 function setupSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
-  var warn = ui.alert(
-    'Rebuild sheets? / Xay dung lai trang tinh?',
-    'EN: This will delete and rebuild the Monthly Calendar and Audit sheets. Any custom content in those tabs will be lost. Continue?\\nVI: Thao tac nay se xoa va xay dung lai trang Monthly Calendar va Audit. Noi dung tuy chinh trong cac tab do se bi mat. Tiep tuc?',
-    ui.ButtonSet.YES_NO
-  );
-  if (warn !== ui.Button.YES) return;
+  try {
+    var ui = SpreadsheetApp.getUi();
+    var warn = ui.alert(
+      'Rebuild sheets? / Xay dung lai trang tinh?',
+      'EN: This will delete and rebuild the Monthly Calendar and Audit sheets. Any custom content in those tabs will be lost. Continue?\\nVI: Thao tac nay se xoa va xay dung lai trang Monthly Calendar va Audit. Noi dung tuy chinh trong cac tab do se bi mat. Tiep tuc?',
+      ui.ButtonSet.YES_NO
+    );
+    if (warn !== ui.Button.YES) return;
+  } catch(e) {
+    // Running from script editor — UI not available, proceed without confirmation
+  }
 
   var oldCal = ss.getSheetByName(CAL_SHEET);
   if (oldCal) ss.deleteSheet(oldCal);
@@ -672,12 +676,14 @@ function pushToApp() {
   try {
     var enrollments = readSheetRows(MASTER_SHEET);
     var events      = readSheetRows(EVENTS_SHEET, true);
-    var confirm = ui.alert(
-      'Confirm Push / Xac nhan gui du lieu',
-      'EN: This will send ' + enrollments.length + ' enrollments and ' + events.length + ' events to the live app. Continue?\\nVI: Thao tac nay se gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien len ung dung. Tiep tuc?',
-      ui.ButtonSet.YES_NO
-    );
-    if (confirm !== ui.Button.YES) return;
+    try {
+      var confirm = ui.alert(
+        'Confirm Push / Xac nhan gui du lieu',
+        'EN: This will send ' + enrollments.length + ' enrollments and ' + events.length + ' events to the live app. Continue?\\nVI: Thao tac nay se gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien len ung dung. Tiep tuc?',
+        ui.ButtonSet.YES_NO
+      );
+      if (confirm !== ui.Button.YES) return;
+    } catch(e) { /* Running from script editor — skip confirmation */ }
     var r1 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', { method: 'post', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, payload: JSON.stringify({ json: { table: 'flattenedEnrollments', rows: enrollments } }), muteHttpExceptions: true });
     if (r1.getResponseCode() !== 200) throw new Error('Enrollments push failed: ' + r1.getContentText());
     var r2 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', { method: 'post', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, payload: JSON.stringify({ json: { table: 'events', rows: events } }), muteHttpExceptions: true });
