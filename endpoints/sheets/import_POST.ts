@@ -367,7 +367,8 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
   );
 
   const scheduleRows: Array<Record<string, any>> = [];
-  const scheduleDeletes: Array<{ enrollmentId: string | number; lessonNumber: number }> = [];
+  // Maps enrollmentId → Set of lessonNumbers that have dates in the sheet
+  const lessonNumbersWithDates = new Map<string | number, Set<number>>();
   let processedEnrollments = 0;
 
   for (const rawRow of rows as Array<Record<string, any>>) {
@@ -416,6 +417,8 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
     if (!enrollment?.id) continue;
     processedEnrollments++;
 
+    const scheduledSet = new Set<number>();
+
     for (let i = 1; i <= MAX_LESSONS; i++) {
       const dtValue = getFromRow(row, [
         `lesson${i}DateTime`,
@@ -430,23 +433,56 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
       const lessonNumber = parseLessonNumber(lessonValue, i);
       const scheduledAt = normalizeDateToIso(dtValue);
 
-      if (!scheduledAt) {
-        scheduleDeletes.push({
-          enrollmentId: enrollment.id,
-          lessonNumber,
-        });
-        continue;
-      }
+      if (!scheduledAt) continue;
 
+      scheduledSet.add(lessonNumber);
       scheduleRows.push({
         enrollmentId: enrollment.id,
         lessonNumber,
         scheduledAt,
       });
     }
+
+    lessonNumbersWithDates.set(enrollment.id, scheduledSet);
   }
 
-  const deleteCount = await handleLessonSchedulesDelete(scheduleDeletes);
+  // Delete lesson schedules that were cleared in the sheet.
+  // Fetch all existing schedules per enrollment in one query instead of
+  // one query per lesson — avoids O(enrollments × MAX_LESSONS) DB round trips.
+  let deleteCount = 0;
+  for (const [enrollmentId, scheduledSet] of lessonNumbersWithDates) {
+    let { data: existing, error } = await supabaseAdmin
+      .from("lessonSchedules")
+      .select("*")
+      .eq("enrollmentId", enrollmentId);
+
+    if (error && isSchemaError(error)) {
+      ({ data: existing, error } = await supabaseAdmin
+        .from("lesson_schedules")
+        .select("*")
+        .eq("enrollment_id", enrollmentId));
+    }
+    if (error) throw error;
+
+    for (const schedule of existing ?? []) {
+      const lessonNum = Number(schedule.lessonNumber ?? schedule.lesson_number);
+      if (scheduledSet.has(lessonNum)) continue; // still has a date — keep it
+
+      // Cancel notifications before deleting
+      const old1h = schedule.notification1hId ?? schedule.notification_1h_id;
+      const old24h = schedule.notification24hId ?? schedule.notification_24h_id;
+      if (old1h) await cancelNotification(old1h);
+      if (old24h) await cancelNotification(old24h);
+
+      const { error: deleteError } = await supabaseAdmin
+        .from("lessonSchedules")
+        .delete()
+        .eq("id", schedule.id);
+      if (deleteError) throw deleteError;
+      deleteCount++;
+    }
+  }
+
   const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
   return processedEnrollments + scheduleCount + deleteCount;
 }
