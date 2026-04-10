@@ -643,7 +643,7 @@ function pullFromApp() {
       ['instructorId','instructorName','instructorEmail'].forEach(function(f) { if (!out[f] && ex[f]) out[f] = ex[f]; });
       for (var i = 1; i <= MAX_LESSONS; i++) {
         var dt = 'lesson'+i+'DateTime', ins = 'lesson'+i+'Instructor', st = 'lesson'+i+'Status';
-        if (ex[dt]) out[dt] = ex[dt];
+        // Lesson date/time should follow the app state so cleared values stay cleared on pull.
         if (!out[ins] && ex[ins]) out[ins] = ex[ins];
         if (!out[st]  && ex[st])  out[st]  = ex[st];
       }
