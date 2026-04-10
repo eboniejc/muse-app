@@ -365,6 +365,10 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
   const enrollmentByKey = new Map(
     (enrollments ?? []).map((e: any) => [`${e.userId}-${e.courseId}`, e])
   );
+  // Also index by id so we can match the exact enrollment the sheet row came from.
+  const enrollmentById = new Map(
+    (enrollments ?? []).map((e: any) => [String(e.id), e])
+  );
 
   const scheduleRows: Array<Record<string, any>> = [];
   const lessonsToDelete: Array<{
@@ -396,8 +400,14 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
     }
     if (!courseId) continue;
 
-    const enrollmentKey = `${userId}-${courseId}`;
-    let enrollment = enrollmentByKey.get(enrollmentKey);
+    // Prefer the enrollmentId from the sheet row — this is the enrollment the user
+    // was editing. Fall back to userId+courseId lookup only if not found in DB.
+    const sheetEnrollmentId = getFromRow(row, ["enrollmentId"]);
+    let enrollment = sheetEnrollmentId ? enrollmentById.get(String(sheetEnrollmentId)) : undefined;
+    if (!enrollment) {
+      const enrollmentKey = `${userId}-${courseId}`;
+      enrollment = enrollmentByKey.get(enrollmentKey);
+    }
     if (!enrollment) {
       const insertPayload = {
         userId,
