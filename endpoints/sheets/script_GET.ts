@@ -627,7 +627,7 @@ function pullFromApp() {
       ['instructorId','instructorName','instructorEmail'].forEach(function(f) { if (!out[f] && ex[f]) out[f] = ex[f]; });
       for (var i = 1; i <= MAX_LESSONS; i++) {
         var dt = 'lesson'+i+'DateTime', ins = 'lesson'+i+'Instructor', st = 'lesson'+i+'Status';
-        if (dt in ex) out[dt] = ex[dt];
+        if (ex[dt]) out[dt] = ex[dt];
         if (!out[ins] && ex[ins]) out[ins] = ex[ins];
         if (!out[st]  && ex[st])  out[st]  = ex[st];
       }
@@ -745,8 +745,9 @@ function syncEventsToCalendar() {
     var desc = (row.caption || '') + '\\n' + tag;
     var ds = new Date(start); ds.setHours(0,0,0,0); var de = new Date(start); de.setHours(23,59,59,999);
     var ex = calendar.getEvents(ds, de).filter(function(ev) { return ev.getDescription().indexOf(tag) !== -1; });
-    if (ex.length) { ex[0].setTitle(row.title); ex[0].setTime(start, end); ex[0].setDescription(desc); }
-    else calendar.createEvent(row.title, start, end, { description: desc });
+    var eventGuests = 'museincproperty@gmail.com';
+    if (ex.length) { ex[0].setTitle(row.title); ex[0].setTime(start, end); ex[0].setDescription(desc); ex[0].addGuest(eventGuests); }
+    else calendar.createEvent(row.title, start, end, { description: desc, guests: eventGuests });
   });
 }
 
@@ -846,7 +847,7 @@ function writeSheetRows(sheetName, headers, rows) {
     var idx = headers.indexOf(col); if (idx >= 0 && values.length > 1) sheet.getRange(2,idx+1,values.length-1,1).setBackground(C.instrBlue);
   });
   for (var r = 2; r < values.length; r++) sheet.getRange(r+1,1,1,headers.length).setBackground(r%2===0 ? C.altRow : C.white);
-  sheet.autoResizeColumns(1, headers.length);
+  // Note: autoResizeColumns omitted for MasterEnrollments — 111 columns would exceed Apps Script time limit
 }
 
 function readSheetRows(sheetName, allowMissing) {
@@ -855,8 +856,15 @@ function readSheetRows(sheetName, allowMissing) {
   if (!sheet) { if (allowMissing) return []; throw new Error('Sheet not found: ' + sheetName); }
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
-  var headers = data[0].map(String), rows = [];
-  for (var i = 1; i < data.length; i++) {
+  // Skip instruction banner rows — find the real header row by looking for known column names
+  var headerRowIdx = 0;
+  var KNOWN_HEADERS = ['enrollmentId', 'id', 'title', 'startAt'];
+  for (var h = 0; h < Math.min(data.length, 6); h++) {
+    var firstCell = String(data[h][0] || '');
+    if (KNOWN_HEADERS.indexOf(firstCell) !== -1) { headerRowIdx = h; break; }
+  }
+  var headers = data[headerRowIdx].map(String), rows = [];
+  for (var i = headerRowIdx + 1; i < data.length; i++) {
     var obj = {}, hasData = false;
     for (var c = 0; c < headers.length; c++) {
       var key = headers[c]; if (!key) continue;
