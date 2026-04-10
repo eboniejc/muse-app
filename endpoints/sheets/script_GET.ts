@@ -649,19 +649,19 @@ function pullFromApp() {
       var out = {}; Object.keys(row).forEach(function(k) { out[k] = row[k]; });
       ['instructorId','instructorName','instructorEmail'].forEach(function(f) { if (!out[f] && ex[f]) out[f] = ex[f]; });
       for (var i = 1; i <= MAX_LESSONS; i++) {
-        var dt = 'lesson'+i+'DateTime', ins = 'lesson'+i+'Instructor', st = 'lesson'+i+'Status';
-        // Preserve existing sheet dates if the app has no date for this lesson.
-        // This protects manually-entered dates that may not yet be in the DB.
-        if (!out[dt] && ex[dt]) out[dt] = ex[dt];
+        var ins = 'lesson'+i+'Instructor';
+        // Lesson date/time and status must follow the app state so cleared lessons stay cleared after pull.
         if (!out[ins] && ex[ins]) out[ins] = ex[ins];
-        if (!out[st]  && ex[st])  out[st]  = ex[st];
       }
       return out;
     });
 
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
     writeSheetRows(MASTER_SHEET, buildEnrollmentHeaders(), merged);
+    _instructMaster(ss);
     writeSheetRows(EVENTS_SHEET, buildEventHeaders(), events);
-    cleanEventsSheet(SpreadsheetApp.getActiveSpreadsheet());
+    cleanEventsSheet(ss);
+    _instructEvents(ss);
     if (cancellations.length) writeSheetRows('Cancellations', buildCancellationHeaders(), cancellations);
 
     ui.alert('Pull complete / Hoan tat',
@@ -859,9 +859,18 @@ function buildEventHeaders() { return ['id','title','caption','flyerUrl','startA
 function buildCancellationHeaders() { return ['enrollmentId','lessonNumber','studentName','studentEmail','courseName','scheduledAt','cancelledAt','hoursNotice','isLate']; }
 function isDateTimeHeader(h) { return /^lesson\\d+DateTime$/.test(h) || ['startAt','endAt','scheduledAt','cancelledAt'].indexOf(h) !== -1; }
 
+function findHeaderRow(sheet, firstHeader) {
+  var maxScanRows = Math.min(sheet.getLastRow(), 10);
+  for (var r = 1; r <= maxScanRows; r++) {
+    if (String(sheet.getRange(r, 1).getValue() || '') === String(firstHeader)) return r;
+  }
+  return 1;
+}
+
 function writeSheetRows(sheetName, headers, rows) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+  var startRow = findHeaderRow(sheet, headers[0]);
   var dateIdxs = []; headers.forEach(function(h,i) { if (isDateTimeHeader(h)) dateIdxs.push(i); });
   var values = [headers];
   rows.forEach(function(row) {
@@ -871,16 +880,28 @@ function writeSheetRows(sheetName, headers, rows) {
       return normalizeCell(raw);
     }));
   });
-  sheet.clear();
-  sheet.getRange(1,1,values.length,headers.length).setValues(values);
-  if (values.length > 1) dateIdxs.forEach(function(idx) { sheet.getRange(2,idx+1,values.length-1,1).setNumberFormat('dd/mm/yy h:mm am/pm'); });
-  sheet.getRange(1,1,1,headers.length).setFontWeight('bold').setBackground(C.navy).setFontColor(C.white);
-  sheet.setFrozenRows(1);
+
+  var clearFromRow = startRow;
+  var clearRowCount = Math.max(sheet.getLastRow() - startRow + 1, values.length);
+  if (clearRowCount > 0) {
+    sheet.getRange(clearFromRow, 1, clearRowCount, headers.length).clearContent().clearFormat();
+  }
+
+  sheet.getRange(startRow, 1, values.length, headers.length).setValues(values);
+  if (values.length > 1) {
+    dateIdxs.forEach(function(idx) {
+      sheet.getRange(startRow + 1, idx + 1, values.length - 1, 1).setNumberFormat('dd/mm/yy h:mm am/pm');
+    });
+  }
+  sheet.getRange(startRow, 1, 1, headers.length).setFontWeight('bold').setBackground(C.navy).setFontColor(C.white);
+
+  var frozenRows = sheet.getFrozenRows();
+  if (frozenRows < startRow) sheet.setFrozenRows(startRow);
   // Apply alternating row colors first (r=1 = first data row = sheet row 2)
-  for (var r = 1; r < values.length; r++) sheet.getRange(r+1,1,1,headers.length).setBackground(r%2===0 ? C.altRow : C.white);
+  for (var r = 1; r < values.length; r++) sheet.getRange(startRow + r,1,1,headers.length).setBackground(r%2===0 ? C.altRow : C.white);
   // Apply instructor column highlight AFTER row colors so it isn't overwritten
   ['instructorId','instructorName','instructorEmail'].forEach(function(col) {
-    var idx = headers.indexOf(col); if (idx >= 0 && values.length > 1) sheet.getRange(2,idx+1,values.length-1,1).setBackground(C.instrBlue);
+    var idx = headers.indexOf(col); if (idx >= 0 && values.length > 1) sheet.getRange(startRow + 1,idx+1,values.length-1,1).setBackground(C.instrBlue);
   });
   // Note: autoResizeColumns omitted for MasterEnrollments — 111 columns would exceed Apps Script time limit
 }
@@ -889,6 +910,7 @@ function readSheetRows(sheetName, allowMissing) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(sheetName);
   if (!sheet) { if (allowMissing) return []; throw new Error('Sheet not found: ' + sheetName); }
+  var tz = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
   // Skip instruction banner rows — find the real header row by looking for known column names
@@ -904,7 +926,7 @@ function readSheetRows(sheetName, allowMissing) {
     for (var c = 0; c < headers.length; c++) {
       var key = headers[c]; if (!key) continue;
       var val = data[i][c];
-      if (val instanceof Date) val = val.toISOString();
+      if (val instanceof Date) val = Utilities.formatDate(val, tz, 'd/M/yyyy H:mm:ss');
       if (val === '') val = null;
       obj[key] = val;
       if (val !== null && val !== undefined) hasData = true;
