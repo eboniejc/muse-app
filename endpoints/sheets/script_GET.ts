@@ -72,8 +72,7 @@ function setupSheets() {
   var ui = SpreadsheetApp.getUi();
   var warn = ui.alert(
     'Rebuild sheets? / Xay dung lai trang tinh?',
-    'EN: This will delete and rebuild the Monthly Calendar and Audit sheets. Any custom content in those tabs will be lost. Continue?\n' +
-    'VI: Thao tac nay se xoa va xay dung lai trang Monthly Calendar va Audit. Noi dung tuy chinh trong cac tab do se bi mat. Tiep tuc?',
+    'EN: This will delete and rebuild the Monthly Calendar and Audit sheets. Any custom content in those tabs will be lost. Continue?\\nVI: Thao tac nay se xoa va xay dung lai trang Monthly Calendar va Audit. Noi dung tuy chinh trong cac tab do se bi mat. Tiep tuc?',
     ui.ButtonSet.YES_NO
   );
   if (warn !== ui.Button.YES) return;
@@ -675,8 +674,7 @@ function pushToApp() {
     var events      = readSheetRows(EVENTS_SHEET, true);
     var confirm = ui.alert(
       'Confirm Push / Xac nhan gui du lieu',
-      'EN: This will send ' + enrollments.length + ' enrollments and ' + events.length + ' events to the live app. Continue?\n' +
-      'VI: Thao tac nay se gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien len ung dung. Tiep tuc?',
+      'EN: This will send ' + enrollments.length + ' enrollments and ' + events.length + ' events to the live app. Continue?\\nVI: Thao tac nay se gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien len ung dung. Tiep tuc?',
       ui.ButtonSet.YES_NO
     );
     if (confirm !== ui.Button.YES) return;
