@@ -451,12 +451,14 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
   // one query per lesson — avoids O(enrollments × MAX_LESSONS) DB round trips.
   let deleteCount = 0;
   for (const [enrollmentId, scheduledSet] of lessonNumbersWithDates) {
+    let scheduleTable = "lessonSchedules";
     let { data: existing, error } = await supabaseAdmin
       .from("lessonSchedules")
       .select("*")
       .eq("enrollmentId", enrollmentId);
 
     if (error && isSchemaError(error)) {
+      scheduleTable = "lesson_schedules";
       ({ data: existing, error } = await supabaseAdmin
         .from("lesson_schedules")
         .select("*")
@@ -475,7 +477,7 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
       if (old24h) await cancelNotification(old24h);
 
       const { error: deleteError } = await supabaseAdmin
-        .from("lessonSchedules")
+        .from(scheduleTable)
         .delete()
         .eq("id", schedule.id);
       if (deleteError) throw deleteError;
