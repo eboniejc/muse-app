@@ -686,19 +686,21 @@ function pushToApp() {
     } catch(e) { /* Running from script editor — skip confirmation */ }
     var r1 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', { method: 'post', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, payload: JSON.stringify({ json: { table: 'flattenedEnrollments', rows: enrollments } }), muteHttpExceptions: true });
     if (r1.getResponseCode() !== 200) throw new Error('Enrollments push failed: ' + r1.getContentText());
+    var r1Body = parseSuperJSON(r1.getContentText());
+    var debugInfo = (r1Body && r1Body.message) ? '\\n\\nDEBUG:\\n' + r1Body.message : '';
     var r2 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', { method: 'post', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, payload: JSON.stringify({ json: { table: 'events', rows: events } }), muteHttpExceptions: true });
     if (r2.getResponseCode() !== 200) throw new Error('Events push failed: ' + r2.getContentText());
     var calId = props.getProperty('CALENDAR_ID');
     if (calId) {
       var choice = ui.alert('Push complete / Hoan tat',
         'EN: ' + enrollments.length + ' enrollments and ' + events.length + ' events sent. Sync to Google Calendar now?\\n' +
-        'VI: Da gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien. Dong bo Google Calendar?',
+        'VI: Da gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien. Dong bo Google Calendar?' + debugInfo,
         ui.ButtonSet.YES_NO);
       if (choice === ui.Button.YES) { syncToCalendar(); syncEventsToCalendar(); }
     } else {
       ui.alert('Push complete / Hoan tat',
         'EN: ' + enrollments.length + ' enrollments and ' + events.length + ' events sent.\\n' +
-        'VI: Da gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien.',
+        'VI: Da gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien.' + debugInfo,
         ui.ButtonSet.OK);
     }
   } catch(err) { ui.alert('Push failed', err.message, ui.ButtonSet.OK); }
