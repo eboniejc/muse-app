@@ -74,15 +74,21 @@ async function safeSelectEbooks() {
 }
 
 async function safeSelectLessonSchedules() {
-  const rows = await safeSelectAll("lessonSchedules");
-  if (rows.length > 0) return rows;
-
+  // Prefer Supabase here because sheet import/delete paths also write through Supabase.
+  // This keeps pull/export consistent with what the app UI shows after a push.
   let { data, error } = await supabaseAdmin.from("lessonSchedules").select("*");
   if (error) {
     const snake = await supabaseAdmin.from("lesson_schedules").select("*");
     data = snake.data;
     error = snake.error;
   }
+  if (!error && data) {
+    return data;
+  }
+
+  const rows = await safeSelectAll("lessonSchedules");
+  if (rows.length > 0) return rows;
+
   if (error) {
     console.error("Sheets export: failed Supabase query for lesson schedules:", error);
     return [];
