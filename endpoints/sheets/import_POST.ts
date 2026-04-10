@@ -295,9 +295,12 @@ export async function handle(request: Request) {
     }
 
     let processedCount = 0;
+    let debugMessage: string | undefined;
 
     if (table === "flattenedEnrollments") {
-      processedCount = await handleFlattenedEnrollmentsImport(rows);
+      const result = await handleFlattenedEnrollmentsImport(rows);
+      processedCount = result.count;
+      debugMessage = result.debug;
     } else if (table === "lessonSchedules") {
       processedCount = await handleLessonSchedulesImport(rows);
     } else if (table === "events") {
@@ -325,6 +328,7 @@ export async function handle(request: Request) {
       superjson.stringify({
         success: true,
         count: processedCount,
+        message: debugMessage,
       } satisfies OutputType)
     );
   } catch (error) {
@@ -440,39 +444,53 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
     lessonNumbersWithDates.set(enrollment.id, scheduledSet);
   }
 
-  // Delete lesson schedules that were cleared in the sheet.
-  // Use a direct DELETE with NOT IN so we never rely on a SELECT returning the right rows.
+  // Delete only the lesson schedules that exist in the DB AND were cleared in the sheet.
+  // We SELECT first to find exact IDs, then DELETE by id — this prevents over-deletion.
+  const debugLines: string[] = [];
   let deleteCount = 0;
   for (const [enrollmentId, scheduledSet] of lessonNumbersWithDates) {
-    const keepLessons = [...scheduledSet];
+    debugLines.push(`enrollment ${enrollmentId}: keeping lessons [${[...scheduledSet].join(",")}]`);
 
-    // Build the list of lesson numbers to DELETE (those NOT in scheduledSet)
-    const lessonsToDelete: number[] = [];
-    for (let i = 1; i <= MAX_LESSONS; i++) {
-      if (!scheduledSet.has(i)) lessonsToDelete.push(i);
-    }
-    if (lessonsToDelete.length === 0) continue; // every lesson slot has a date — nothing to delete
-
-    // Try camelCase table first, fall back to snake_case
-    let { error: deleteError } = await supabaseAdmin
+    // SELECT existing schedules for this enrollment
+    let scheduleTable = "lessonSchedules";
+    let { data: existing, error: selectError } = await supabaseAdmin
       .from("lessonSchedules")
-      .delete()
-      .eq("enrollmentId", enrollmentId)
-      .in("lessonNumber", lessonsToDelete);
+      .select("id, lessonNumber")
+      .eq("enrollmentId", enrollmentId);
 
-    if (deleteError && isSchemaError(deleteError)) {
-      ({ error: deleteError } = await supabaseAdmin
+    if (selectError && isSchemaError(selectError)) {
+      scheduleTable = "lesson_schedules";
+      ({ data: existing, error: selectError } = await supabaseAdmin
         .from("lesson_schedules")
-        .delete()
-        .eq("enrollment_id", enrollmentId)
-        .in("lesson_number", lessonsToDelete));
+        .select("id, lesson_number")
+        .eq("enrollment_id", enrollmentId));
     }
+    if (selectError) throw selectError;
+
+    // Find which DB records correspond to lessons now cleared in the sheet
+    const idsToDelete = (existing ?? [])
+      .filter((s: any) => {
+        const lessonNum = Number(s.lessonNumber ?? s.lesson_number ?? 0);
+        return !scheduledSet.has(lessonNum);
+      })
+      .map((s: any) => s.id);
+
+    debugLines.push(`  → table=${scheduleTable} found=${existing?.length ?? 0} inDB, toDelete=${idsToDelete.length} ids=[${idsToDelete.join(",")}]`);
+
+    if (idsToDelete.length === 0) continue;
+
+    // Delete by primary key — safest possible filter
+    const { error: deleteError } = await supabaseAdmin
+      .from(scheduleTable)
+      .delete()
+      .in("id", idsToDelete);
     if (deleteError) throw deleteError;
-    deleteCount++;
+    deleteCount += idsToDelete.length;
   }
 
+  debugLines.push(`scheduleRows to upsert: ${scheduleRows.length}`);
   const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
-  return processedEnrollments + scheduleCount + deleteCount;
+  return { count: processedEnrollments + scheduleCount + deleteCount, debug: debugLines.join("\n") };
 }
 
 async function handleLessonSchedulesDelete(
