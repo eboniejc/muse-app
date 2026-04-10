@@ -446,34 +446,26 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
   for (const [enrollmentId, scheduledSet] of lessonNumbersWithDates) {
     const keepLessons = [...scheduledSet];
 
-    let deleteError: any;
-    if (keepLessons.length === 0) {
-      // All dates cleared — delete every schedule for this enrollment
+    // Build the list of lesson numbers to DELETE (those NOT in scheduledSet)
+    const lessonsToDelete: number[] = [];
+    for (let i = 1; i <= MAX_LESSONS; i++) {
+      if (!scheduledSet.has(i)) lessonsToDelete.push(i);
+    }
+    if (lessonsToDelete.length === 0) continue; // every lesson slot has a date — nothing to delete
+
+    // Try camelCase table first, fall back to snake_case
+    let { error: deleteError } = await supabaseAdmin
+      .from("lessonSchedules")
+      .delete()
+      .eq("enrollmentId", enrollmentId)
+      .in("lessonNumber", lessonsToDelete);
+
+    if (deleteError && isSchemaError(deleteError)) {
       ({ error: deleteError } = await supabaseAdmin
-        .from("lessonSchedules")
+        .from("lesson_schedules")
         .delete()
-        .eq("enrollmentId", enrollmentId));
-      if (deleteError && isSchemaError(deleteError)) {
-        ({ error: deleteError } = await supabaseAdmin
-          .from("lesson_schedules")
-          .delete()
-          .eq("enrollment_id", enrollmentId));
-      }
-    } else {
-      // Only delete schedules for lesson numbers NOT in the sheet any more
-      const inList = `(${keepLessons.join(",")})`;
-      ({ error: deleteError } = await supabaseAdmin
-        .from("lessonSchedules")
-        .delete()
-        .eq("enrollmentId", enrollmentId)
-        .not("lessonNumber", "in", inList));
-      if (deleteError && isSchemaError(deleteError)) {
-        ({ error: deleteError } = await supabaseAdmin
-          .from("lesson_schedules")
-          .delete()
-          .eq("enrollment_id", enrollmentId)
-          .not("lesson_number", "in", inList));
-      }
+        .eq("enrollment_id", enrollmentId)
+        .in("lesson_number", lessonsToDelete));
     }
     if (deleteError) throw deleteError;
     deleteCount++;
