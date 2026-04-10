@@ -4,7 +4,7 @@ import { OutputType } from "./export_POST.schema";
 import superjson from "superjson";
 import { supabaseAdmin } from "../../helpers/supabaseServer";
 
-const MAX_LESSONS = 16;
+const MAX_LESSONS = 33;
 
 async function safeSelectAll(table: string) {
   try {

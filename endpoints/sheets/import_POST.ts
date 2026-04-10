@@ -7,7 +7,7 @@ import {
 } from "../../helpers/sendPushNotification";
 import { supabaseAdmin } from "../../helpers/supabaseServer";
 
-const MAX_LESSONS = 16;
+const MAX_LESSONS = 33;
 
 const TABLE_COLUMNS: Record<string, Set<string>> = {
   courses: new Set([
