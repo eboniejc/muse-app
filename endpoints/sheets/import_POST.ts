@@ -295,12 +295,9 @@ export async function handle(request: Request) {
     }
 
     let processedCount = 0;
-    let debugMessage: string | undefined;
 
     if (table === "flattenedEnrollments") {
-      const result = await handleFlattenedEnrollmentsImport(rows);
-      processedCount = result.count;
-      debugMessage = result.debug;
+      processedCount = await handleFlattenedEnrollmentsImport(rows);
     } else if (table === "lessonSchedules") {
       processedCount = await handleLessonSchedulesImport(rows);
     } else if (table === "events") {
@@ -328,7 +325,6 @@ export async function handle(request: Request) {
       superjson.stringify({
         success: true,
         count: processedCount,
-        message: debugMessage,
       } satisfies OutputType)
     );
   } catch (error) {
@@ -446,11 +442,8 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
 
   // Delete only the lesson schedules that exist in the DB AND were cleared in the sheet.
   // We SELECT first to find exact IDs, then DELETE by id — this prevents over-deletion.
-  const debugLines: string[] = [];
   let deleteCount = 0;
   for (const [enrollmentId, scheduledSet] of lessonNumbersWithDates) {
-    debugLines.push(`enrollment ${enrollmentId}: keeping lessons [${[...scheduledSet].join(",")}]`);
-
     // SELECT existing schedules for this enrollment
     let scheduleTable = "lessonSchedules";
     let { data: existing, error: selectError } = await supabaseAdmin
@@ -475,8 +468,6 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
       })
       .map((s: any) => s.id);
 
-    debugLines.push(`  → table=${scheduleTable} found=${existing?.length ?? 0} inDB, toDelete=${idsToDelete.length} ids=[${idsToDelete.join(",")}]`);
-
     if (idsToDelete.length === 0) continue;
 
     // Delete by primary key — safest possible filter
@@ -488,9 +479,8 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
     deleteCount += idsToDelete.length;
   }
 
-  debugLines.push(`scheduleRows to upsert: ${scheduleRows.length}`);
   const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
-  return { count: processedEnrollments + scheduleCount + deleteCount, debug: debugLines.join("\n") };
+  return processedEnrollments + scheduleCount + deleteCount;
 }
 
 async function handleLessonSchedulesDelete(
