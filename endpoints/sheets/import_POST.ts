@@ -367,8 +367,10 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
   );
 
   const scheduleRows: Array<Record<string, any>> = [];
-  // Maps enrollmentId → Set of lessonNumbers that have dates in the sheet
-  const lessonNumbersWithDates = new Map<string | number, Set<number>>();
+  const lessonsToDelete: Array<{
+    enrollmentId: string | number;
+    lessonNumber: number;
+  }> = [];
   let processedEnrollments = 0;
 
   for (const rawRow of rows as Array<Record<string, any>>) {
@@ -417,68 +419,39 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
     if (!enrollment?.id) continue;
     processedEnrollments++;
 
-    const scheduledSet = new Set<number>();
-
     for (let i = 1; i <= MAX_LESSONS; i++) {
-      const dtValue = getFromRow(row, [
+      const lessonKeys = [
         `lesson${i}DateTime`,
         `Lesson ${i} Date/Time`,
         `lesson${i}At`,
-      ]);
+      ];
+      const hasLessonColumn = lessonKeys.some((key) =>
+        Object.prototype.hasOwnProperty.call(row, key)
+      );
+      const dtValue = getFromRow(row, lessonKeys);
       const scheduledAt = normalizeDateToIso(dtValue);
 
-      if (!scheduledAt) continue;
+      if (scheduledAt) {
+        scheduleRows.push({
+          enrollmentId: enrollment.id,
+          lessonNumber: i,
+          scheduledAt,
+        });
+        continue;
+      }
 
-      scheduledSet.add(i);
-      scheduleRows.push({
-        enrollmentId: enrollment.id,
-        lessonNumber: i,
-        scheduledAt,
-      });
+      // Only treat explicit blanks as deletions.
+      // Invalid/non-empty values should not remove an existing schedule.
+      if (hasLessonColumn && (dtValue === null || dtValue === undefined || dtValue === "")) {
+        lessonsToDelete.push({
+          enrollmentId: enrollment.id,
+          lessonNumber: i,
+        });
+      }
     }
-
-    lessonNumbersWithDates.set(enrollment.id, scheduledSet);
   }
 
-  // Delete only the lesson schedules that exist in the DB AND were cleared in the sheet.
-  // We SELECT first to find exact IDs, then DELETE by id — this prevents over-deletion.
-  let deleteCount = 0;
-  for (const [enrollmentId, scheduledSet] of lessonNumbersWithDates) {
-    // SELECT existing schedules for this enrollment
-    let scheduleTable = "lessonSchedules";
-    let { data: existing, error: selectError } = await supabaseAdmin
-      .from("lessonSchedules")
-      .select("id, lessonNumber")
-      .eq("enrollmentId", enrollmentId);
-
-    if (selectError && isSchemaError(selectError)) {
-      scheduleTable = "lesson_schedules";
-      ({ data: existing, error: selectError } = await supabaseAdmin
-        .from("lesson_schedules")
-        .select("id, lesson_number")
-        .eq("enrollment_id", enrollmentId));
-    }
-    if (selectError) throw selectError;
-
-    // Find which DB records correspond to lessons now cleared in the sheet
-    const idsToDelete = (existing ?? [])
-      .filter((s: any) => {
-        const lessonNum = Number(s.lessonNumber ?? s.lesson_number ?? 0);
-        return !scheduledSet.has(lessonNum);
-      })
-      .map((s: any) => s.id);
-
-    if (idsToDelete.length === 0) continue;
-
-    // Delete by primary key — safest possible filter
-    const { error: deleteError } = await supabaseAdmin
-      .from(scheduleTable)
-      .delete()
-      .in("id", idsToDelete);
-    if (deleteError) throw deleteError;
-    deleteCount += idsToDelete.length;
-  }
-
+  const deleteCount = await handleLessonSchedulesDelete(lessonsToDelete);
   const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
   return processedEnrollments + scheduleCount + deleteCount;
 }
