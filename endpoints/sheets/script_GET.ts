@@ -633,6 +633,13 @@ function pullFromApp() {
     var events        = (parsed && parsed.data && parsed.data.events)               || [];
     var cancellations = (parsed && parsed.data && parsed.data.lessonCancellations)  || [];
 
+    // Safety check: if the app returned 0 enrollments but the sheet has data,
+    // something went wrong on the server — abort rather than wiping the sheet.
+    var existingCount = Object.keys(existingById).length;
+    if (enrollments.length === 0 && existingCount > 0) {
+      throw new Error('EN: Server returned 0 enrollments but sheet has ' + existingCount + ' rows. Aborting to protect your data. Check the app server.\\nVI: May chu tra ve 0 don dang ky nhung bang tinh co ' + existingCount + ' dong. Huy bo de bao ve du lieu.');
+    }
+
     var merged = enrollments.map(function(row) {
       var ex = existingById[String(row.enrollmentId || '')];
       if (!ex) return row;
@@ -643,7 +650,9 @@ function pullFromApp() {
       ['instructorId','instructorName','instructorEmail'].forEach(function(f) { if (!out[f] && ex[f]) out[f] = ex[f]; });
       for (var i = 1; i <= MAX_LESSONS; i++) {
         var dt = 'lesson'+i+'DateTime', ins = 'lesson'+i+'Instructor', st = 'lesson'+i+'Status';
-        // Lesson date/time should follow the app state so cleared values stay cleared on pull.
+        // Preserve existing sheet dates if the app has no date for this lesson.
+        // This protects manually-entered dates that may not yet be in the DB.
+        if (!out[dt] && ex[dt]) out[dt] = ex[dt];
         if (!out[ins] && ex[ins]) out[ins] = ex[ins];
         if (!out[st]  && ex[st])  out[st]  = ex[st];
       }
