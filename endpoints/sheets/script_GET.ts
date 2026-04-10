@@ -69,6 +69,14 @@ function installTrigger() {
 
 function setupSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var warn = ui.alert(
+    'Rebuild sheets? / Xay dung lai trang tinh?',
+    'EN: This will delete and rebuild the Monthly Calendar and Audit sheets. Any custom content in those tabs will be lost. Continue?\n' +
+    'VI: Thao tac nay se xoa va xay dung lai trang Monthly Calendar va Audit. Noi dung tuy chinh trong cac tab do se bi mat. Tiep tuc?',
+    ui.ButtonSet.YES_NO
+  );
+  if (warn !== ui.Button.YES) return;
 
   var oldCal = ss.getSheetByName(CAL_SHEET);
   if (oldCal) ss.deleteSheet(oldCal);
@@ -100,11 +108,16 @@ function cleanEventsSheet(ss) {
 
   // Read existing data so we can rewrite cleanly
   var existingData = sheet.getDataRange().getValues();
-  var existingHeaders = existingData.length > 0 ? existingData[0].map(String) : [];
+  // Skip instruction banner rows — find the real header row (starts with 'id')
+  var hdrIdx = 0;
+  for (var h = 0; h < Math.min(existingData.length, 6); h++) {
+    if (String(existingData[h][0] || '') === 'id') { hdrIdx = h; break; }
+  }
+  var existingHeaders = existingData.length > 0 ? existingData[hdrIdx].map(String) : [];
 
   // Remap rows to the correct 7-column order
   var cleanRows = [];
-  for (var i = 1; i < existingData.length; i++) {
+  for (var i = hdrIdx + 1; i < existingData.length; i++) {
     var row = existingData[i];
     var hasData = row.some(function(v) { return v !== '' && v !== null && v !== undefined; });
     if (!hasData) continue;
@@ -660,6 +673,13 @@ function pushToApp() {
   try {
     var enrollments = readSheetRows(MASTER_SHEET);
     var events      = readSheetRows(EVENTS_SHEET, true);
+    var confirm = ui.alert(
+      'Confirm Push / Xac nhan gui du lieu',
+      'EN: This will send ' + enrollments.length + ' enrollments and ' + events.length + ' events to the live app. Continue?\n' +
+      'VI: Thao tac nay se gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien len ung dung. Tiep tuc?',
+      ui.ButtonSet.YES_NO
+    );
+    if (confirm !== ui.Button.YES) return;
     var r1 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', { method: 'post', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, payload: JSON.stringify({ json: { table: 'flattenedEnrollments', rows: enrollments } }), muteHttpExceptions: true });
     if (r1.getResponseCode() !== 200) throw new Error('Enrollments push failed: ' + r1.getContentText());
     var r2 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', { method: 'post', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, payload: JSON.stringify({ json: { table: 'events', rows: events } }), muteHttpExceptions: true });
@@ -843,10 +863,12 @@ function writeSheetRows(sheetName, headers, rows) {
   if (values.length > 1) dateIdxs.forEach(function(idx) { sheet.getRange(2,idx+1,values.length-1,1).setNumberFormat('dd/mm/yy h:mm am/pm'); });
   sheet.getRange(1,1,1,headers.length).setFontWeight('bold').setBackground(C.navy).setFontColor(C.white);
   sheet.setFrozenRows(1);
+  // Apply alternating row colors first (r=1 = first data row = sheet row 2)
+  for (var r = 1; r < values.length; r++) sheet.getRange(r+1,1,1,headers.length).setBackground(r%2===0 ? C.altRow : C.white);
+  // Apply instructor column highlight AFTER row colors so it isn't overwritten
   ['instructorId','instructorName','instructorEmail'].forEach(function(col) {
     var idx = headers.indexOf(col); if (idx >= 0 && values.length > 1) sheet.getRange(2,idx+1,values.length-1,1).setBackground(C.instrBlue);
   });
-  for (var r = 2; r < values.length; r++) sheet.getRange(r+1,1,1,headers.length).setBackground(r%2===0 ? C.altRow : C.white);
   // Note: autoResizeColumns omitted for MasterEnrollments — 111 columns would exceed Apps Script time limit
 }
 
