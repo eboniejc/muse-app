@@ -420,8 +420,10 @@ function _writeLessonsSheet(lessonRows, instructors) {
       var dt = new Date(row.scheduledAt);
       if (!isNaN(dt.getTime())) {
         dateVal = dt; // will be formatted as date
-        // Format time as h:mmam/pm
-        var h = dt.getHours(), m = dt.getMinutes();
+        // Convert UTC → Vietnam local time (UTC+7) before formatting
+        var vnMs   = dt.getTime() + 7 * 60 * 60 * 1000;
+        var vnDate = new Date(vnMs);
+        var h = vnDate.getUTCHours(), m = vnDate.getUTCMinutes();
         var ampm = h >= 12 ? 'pm' : 'am';
         var h12  = h % 12 || 12;
         timeVal  = h12 + ':' + (m < 10 ? '0' : '') + m + ampm;
@@ -503,21 +505,34 @@ function _readLessonsSheet() {
     if (!enrollmentId || !lessonNumber) return;
 
     var dateVal = r[COL_DATE - 1];
-    var timeVal = String(r[COL_TIME - 1] || '').trim();
+    var timeRaw = r[COL_TIME - 1];
     var scheduledAt = null;
 
     if (dateVal) {
       var d = (dateVal instanceof Date) ? dateVal : new Date(dateVal);
       if (!isNaN(d.getTime())) {
-        // Parse time string e.g. "9:00am", "2:30pm"
+        // Sheets auto-converts time-looking strings ("9:00am") to Date objects
+        // or fractional-day numbers. Handle all three cases.
         var hour = 0, minute = 0;
-        if (timeVal) {
-          var tm = timeVal.match(/^(\\d{1,2}):(\\d{2})(am|pm)$/i);
-          if (tm) {
-            hour   = parseInt(tm[1], 10);
-            minute = parseInt(tm[2], 10);
-            if (tm[3].toLowerCase() === 'pm' && hour < 12) hour += 12;
-            if (tm[3].toLowerCase() === 'am' && hour === 12) hour = 0;
+        if (timeRaw instanceof Date) {
+          // Date with epoch Dec 30 1899 — use UTC hours/minutes
+          hour   = timeRaw.getUTCHours();
+          minute = timeRaw.getUTCMinutes();
+        } else if (typeof timeRaw === 'number' && timeRaw > 0 && timeRaw < 1) {
+          // Fractional day: 0.375 = 9am, 0.5 = noon, etc.
+          var totalMins = Math.round(timeRaw * 24 * 60);
+          hour   = Math.floor(totalMins / 60);
+          minute = totalMins % 60;
+        } else {
+          var timeStr = String(timeRaw || '').trim();
+          if (timeStr) {
+            var tm = timeStr.match(/^(\\d{1,2}):(\\d{2})(am|pm)$/i);
+            if (tm) {
+              hour   = parseInt(tm[1], 10);
+              minute = parseInt(tm[2], 10);
+              if (tm[3].toLowerCase() === 'pm' && hour < 12) hour += 12;
+              if (tm[3].toLowerCase() === 'am' && hour === 12) hour = 0;
+            }
           }
         }
         // Build datetime in Vietnam timezone (UTC+7) → convert to UTC
