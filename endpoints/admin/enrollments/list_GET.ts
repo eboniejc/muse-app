@@ -3,6 +3,7 @@ import { getServerUserSession } from "../../../helpers/getServerUserSession";
 import { schema, OutputType } from "./list_GET.schema";
 import superjson from "superjson";
 import { NotAuthenticatedError } from "../../../helpers/getSetServerSession";
+import { supabaseAdmin } from "../../../helpers/supabaseServer";
 
 export async function handle(request: Request) {
   try {
@@ -70,12 +71,17 @@ export async function handle(request: Request) {
       .where("enrollmentId", "in", enrollmentIds)
       .execute();
 
-    // Fetch lesson schedules for these enrollments
-    const allSchedules = await db
-      .selectFrom("lessonSchedules")
-      .select(["enrollmentId", "lessonNumber", "scheduledAt"])
-      .where("enrollmentId", "in", enrollmentIds)
-      .execute();
+    // Fetch lesson schedules via Supabase (same path as the sheet import writer)
+    // to avoid ORM camelCase→snake_case table name mismatch with lessonSchedules.
+    const { data: rawSchedules } = await supabaseAdmin
+      .from("lessonSchedules")
+      .select("enrollmentId, lessonNumber, scheduledAt")
+      .in("enrollmentId", enrollmentIds as any[]);
+    const allSchedules = (rawSchedules ?? []).map((s: any) => ({
+      enrollmentId: s.enrollmentId ?? s.enrollment_id,
+      lessonNumber: s.lessonNumber ?? s.lesson_number,
+      scheduledAt: s.scheduledAt ?? s.scheduled_at,
+    }));
 
     // Map completions and schedules to enrollments
     const enrollmentsWithDetails = enrollments.map((enrollment) => {

@@ -30,18 +30,43 @@ var TIME_SLOTS = (function() {
 })();
 
 var C = {
-  navy:     '#1a2744',
-  navyMid:  '#2c3e6b',
-  white:    '#ffffff',
-  altRow:   '#f7f9ff',
-  readonly: '#f0f0f0',
-  inputBg:  '#ffffff',
-  calBlue:  '#ddeeff',
-  stepsYel: '#fffbe6',
-  stepsText:'#5a4000',
-  hintText: '#888888',
-  labelText:'#333333',
+  navy:        '#1a2744',
+  navyMid:     '#2c3e6b',
+  white:       '#ffffff',
+  altRow:      '#f4f7ff',
+  readonly:    '#f0f2f8',
+  inputBg:     '#ffffff',
+  calBlue:     '#ddeeff',
+  calBlueDark: '#b8d4f5',
+  stepsYel:    '#fffbe6',
+  stepsText:   '#5a4000',
+  hintText:    '#888888',
+  labelText:   '#333333',
+  mutedBorder: '#dce3f5',
+  statusDone:  '#e6f9ed',
+  statusWait:  '#fff7e0',
+  statusCxl:   '#fde8e8',
 };
+
+// Pastel palette — one colour per student enrollment for quick visual scanning
+var ENROLLMENT_PALETTE = [
+  '#ffe8e8', // rose
+  '#fff4e0', // amber
+  '#e8f9ee', // mint
+  '#e8f0ff', // periwinkle
+  '#f5e8ff', // lavender
+  '#ffe8f8', // blush
+  '#e8fffe', // aqua
+  '#f9ffe8', // lime
+];
+
+// Hardcoded instructor list — always available in the dropdown
+var STATIC_INSTRUCTORS = [
+  'Djzbuzhh1304@gmail.com',
+  'dj.jakeryan95@gmail.com',
+  'djnapple@gmail.com',
+  'thienga1110@gmail.com',
+];
 
 // Columns in the Lessons sheet (1-indexed)
 var COL_ENROLLMENT_ID = 1;
@@ -168,6 +193,7 @@ function pullFromApp() {
     return;
   }
   try {
+    SpreadsheetApp.getActiveSpreadsheet().toast('Fetching data from app…', 'MUSE INC Sync', 30);
     var res = UrlFetchApp.fetch(appUrl + '/_api/sheets/export', {
       method: 'post',
       headers: { 'x-api-key': apiKey },
@@ -194,9 +220,9 @@ function pullFromApp() {
     _ensureAuditSheet(SpreadsheetApp.getActiveSpreadsheet());
     if (cancellations.length) _writeCancellationsSheet(cancellations);
 
-    ui.alert('Pull complete',
+    SpreadsheetApp.getActiveSpreadsheet().toast(
       lessonRows.length + ' lesson rows, ' + events.length + ' events loaded.',
-      ui.ButtonSet.OK);
+      'Pull complete ✓', 5);
   } catch(err) { ui.alert('Pull failed', err.message, ui.ButtonSet.OK); }
 }
 
@@ -222,6 +248,8 @@ function pushToApp() {
     );
     if (confirm !== ui.Button.YES) return;
 
+    SpreadsheetApp.getActiveSpreadsheet().toast('Sending to app…', 'MUSE INC Sync', 60);
+
     var r1 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', {
       method: 'post',
       headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
@@ -240,14 +268,16 @@ function pushToApp() {
 
     var calId = props.getProperty('CALENDAR_ID');
     if (calId) {
-      var choice = ui.alert('Push complete',
-        lessonRows.length + ' lessons and ' + events.length + ' events sent. Sync to Google Calendar now?',
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        lessonRows.length + ' lessons sent.', 'Push complete ✓', 4);
+      var choice = ui.alert('Sync Calendar?',
+        'Sync ' + lessonRows.length + ' lessons to Google Calendar now?',
         ui.ButtonSet.YES_NO);
       if (choice === ui.Button.YES) { syncToCalendar(); syncEventsToCalendar(); }
     } else {
-      ui.alert('Push complete',
+      SpreadsheetApp.getActiveSpreadsheet().toast(
         lessonRows.length + ' lessons and ' + events.length + ' events sent.',
-        ui.ButtonSet.OK);
+        'Push complete ✓', 5);
     }
   } catch(err) { ui.alert('Push failed', err.message, ui.ButtonSet.OK); }
 }
@@ -448,30 +478,12 @@ function _writeLessonsSheet(lessonRows, instructors) {
   // Format date column
   sheet.getRange(2, COL_DATE, values.length, 1).setNumberFormat('dd/mm/yyyy');
 
-  // Date validation is required for Google Sheets to show the calendar picker UI.
+  // Date validation shows the calendar picker UI
   var dateRule = SpreadsheetApp.newDataValidation()
     .requireDate()
     .setAllowInvalid(false)
     .build();
   sheet.getRange(2, COL_DATE, values.length, 1).setDataValidation(dateRule);
-
-  // Read-only columns: grey background (enrollmentId, studentName, email, course, lessonNum, status)
-  [COL_ENROLLMENT_ID, COL_STUDENT_NAME, COL_EMAIL, COL_COURSE_NAME, COL_LESSON_NUM, COL_STATUS].forEach(function(col) {
-    sheet.getRange(2, col, values.length, 1).setBackground(C.readonly);
-  });
-
-  // Editable columns: white background
-  [COL_DATE, COL_TIME, COL_INSTRUCTOR].forEach(function(col) {
-    sheet.getRange(2, col, values.length, 1).setBackground(C.inputBg);
-  });
-
-  // Alternating row shading on read-only cols
-  for (var r = 0; r < values.length; r++) {
-    var bg = r % 2 === 0 ? C.altRow : C.white;
-    [COL_ENROLLMENT_ID, COL_STUDENT_NAME, COL_EMAIL, COL_COURSE_NAME, COL_LESSON_NUM, COL_STATUS].forEach(function(col) {
-      sheet.getRange(r + 2, col).setBackground(r % 2 === 0 ? '#e8e8e8' : C.readonly);
-    });
-  }
 
   // Time dropdown
   var timeRule = SpreadsheetApp.newDataValidation()
@@ -480,15 +492,20 @@ function _writeLessonsSheet(lessonRows, instructors) {
     .build();
   sheet.getRange(2, COL_TIME, values.length, 1).setDataValidation(timeRule);
 
-  // Always apply instructor validation so the dropdown UI is available.
-  // When no instructors are configured yet, use a blank placeholder option
-  // and still allow users to type a custom name.
-  var instructorOptions = instructors.length ? instructors : [''];
+  // Instructor dropdown (always available — includes static list)
+  var instructorOptions = instructors.length ? instructors : STATIC_INSTRUCTORS;
   var instrRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(instructorOptions, true)
-    .setAllowInvalid(true) // allow typing a custom name
+    .setAllowInvalid(true)
     .build();
   sheet.getRange(2, COL_INSTRUCTOR, values.length, 1).setDataValidation(instrRule);
+
+  // Per-enrollment pastel row colours + editable column whites
+  var enrollmentColors = _buildEnrollmentColors(lessonRows);
+  _applyRowStyles(sheet, 2, values, enrollmentColors);
+
+  // Status column colour coding
+  _applyStatusColors(sheet, 2, values.length);
 }
 
 function _readLessonsSheet() {
@@ -559,11 +576,65 @@ function _readLessonsSheet() {
 
 function _extractInstructors(lessonRows) {
   var seen = {}, list = [];
+  // Seed with static instructors first
+  STATIC_INSTRUCTORS.forEach(function(email) {
+    if (!seen[email]) { seen[email] = true; list.push(email); }
+  });
+  // Add any additional instructors from DB data
   lessonRows.forEach(function(r) {
     var n = String(r.instructor || '').trim();
     if (n && !seen[n]) { seen[n] = true; list.push(n); }
   });
-  return list.sort();
+  return list;
+}
+
+function _buildEnrollmentColors(lessonRows) {
+  var seen = {}, idx = 0, colors = {};
+  lessonRows.forEach(function(row) {
+    var eid = String(row.enrollmentId);
+    if (!seen[eid]) {
+      seen[eid] = true;
+      colors[eid] = ENROLLMENT_PALETTE[idx % ENROLLMENT_PALETTE.length];
+      idx++;
+    }
+  });
+  return colors;
+}
+
+// Batch-apply per-enrollment pastel backgrounds to read-only columns
+// and white to editable columns. Much faster than per-cell loops.
+function _applyRowStyles(sheet, startRow, values, enrollmentColors) {
+  var readonlyCols = [COL_ENROLLMENT_ID, COL_STUDENT_NAME, COL_EMAIL, COL_COURSE_NAME, COL_LESSON_NUM];
+  var editableCols = [COL_DATE, COL_TIME, COL_INSTRUCTOR];
+  var count = values.length;
+
+  readonlyCols.forEach(function(col) {
+    var bgs = values.map(function(r) {
+      return [enrollmentColors[String(r[COL_ENROLLMENT_ID - 1])] || C.readonly];
+    });
+    sheet.getRange(startRow, col, count, 1).setBackgrounds(bgs);
+  });
+
+  var whiteBgs = values.map(function() { return [C.inputBg]; });
+  editableCols.forEach(function(col) {
+    sheet.getRange(startRow, col, count, 1).setBackgrounds(whiteBgs);
+  });
+}
+
+// Batch colour-code the Status column: green=completed, red=cancelled,
+// amber=has a date (scheduled), grey=no date yet.
+function _applyStatusColors(sheet, startRow, count) {
+  var statusVals = sheet.getRange(startRow, COL_STATUS, count, 1).getValues();
+  var dateVals   = sheet.getRange(startRow, COL_DATE,   count, 1).getValues();
+  var bgs = statusVals.map(function(sr, i) {
+    var s = String(sr[0] || '').toLowerCase().trim();
+    var hasDate = !!dateVals[i][0];
+    return [s === 'completed' ? C.statusDone
+          : s === 'cancelled' ? C.statusCxl
+          : hasDate           ? C.statusWait
+          : C.readonly];
+  });
+  sheet.getRange(startRow, COL_STATUS, count, 1).setBackgrounds(bgs);
 }
 
 // ── Events Sheet ──────────────────────────────────────────────────────────────
@@ -712,6 +783,7 @@ function renderCalendar(sheet) {
     }
   } catch(e) { Logger.log('renderCalendar error: ' + e.message); }
 
+  var today       = new Date();
   var daysInMonth = new Date(year, month, 0).getDate();
   var startDow    = new Date(year, month - 1, 1).getDay();
   var weeks = [], week = [];
@@ -746,8 +818,13 @@ function renderCalendar(sheet) {
         lines.push((l.time ? l.time + '  ' : '') + l.student);
         if (l.course) lines.push('  ' + l.course + (l.instructor ? ' - ' + l.instructor : ''));
       });
+      var isToday = day === today.getDate()
+                 && month === today.getMonth() + 1
+                 && year  === today.getFullYear();
+      var bg = isToday ? C.calBlueDark : (lessons.length ? C.calBlue : C.white);
       cell.setValue(lines.join('\\n')).setWrap(true).setVerticalAlignment('top')
-        .setBackground(lessons.length ? C.calBlue : C.white)
+        .setBackground(bg)
+        .setFontWeight(isToday ? 'bold' : 'normal')
         .setBorder(true,true,true,true,false,false,'#cccccc',SpreadsheetApp.BorderStyle.SOLID);
     });
   });
@@ -855,7 +932,14 @@ function renderAudit(sheet) {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-function parseSuperJSON(text) { var r = JSON.parse(text); return (r && r.json) ? r.json : r; }
+function parseSuperJSON(text) {
+  try {
+    var r = JSON.parse(text);
+    return (r && r.json) ? r.json : r;
+  } catch(e) {
+    throw new Error('Invalid response from server: ' + e.message);
+  }
+}
 
 function makeCancelLink(appUrl, apiKey, enrollmentId, lessonNumber) {
   var msg  = enrollmentId + ':' + lessonNumber;
