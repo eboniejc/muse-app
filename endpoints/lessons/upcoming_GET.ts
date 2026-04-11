@@ -18,7 +18,11 @@ function isSchemaError(error: any): boolean {
 export async function handle(request: Request) {
   try {
     const { user } = await getServerUserSession(request);
-    const nowIso = new Date().toISOString();
+    // Show lessons from start of today (not just strict future) so lessons
+    // scheduled earlier today still appear in the student's view.
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const fromIso = todayStart.toISOString();
 
     let enrollments: any[] = [];
     let enrollmentErr: any = null;
@@ -60,31 +64,37 @@ export async function handle(request: Request) {
     );
 
     let schedules: any[] = [];
-    let scheduleErr: any = null;
-    ({ data: schedules, error: scheduleErr } = await supabaseAdmin
+
+    // Try camelCase column names first (matches the import write path)
+    const { data: schedData, error: schedErr } = await supabaseAdmin
       .from("lessonSchedules")
       .select("id,enrollmentId,lessonNumber,scheduledAt")
       .in("enrollmentId", enrollmentIds)
-      .gte("scheduledAt", nowIso)
-      .order("scheduledAt", { ascending: true }));
+      .gte("scheduledAt", fromIso)
+      .order("scheduledAt", { ascending: true });
 
-    if (scheduleErr || !schedules) {
-      const snake = await supabaseAdmin
-        .from("lesson_schedules")
+    if (!schedErr && schedData && schedData.length > 0) {
+      schedules = schedData;
+    } else {
+      // Fallback: try snake_case column names
+      const { data: snakeData, error: snakeErr } = await supabaseAdmin
+        .from("lessonSchedules")
         .select("id,enrollment_id,lesson_number,scheduled_at")
         .in("enrollment_id", enrollmentIds)
-        .gte("scheduled_at", nowIso)
+        .gte("scheduled_at", fromIso)
         .order("scheduled_at", { ascending: true });
-      if (snake.error && !isSchemaError(snake.error)) throw snake.error;
-      if (!snake.error && snake.data) {
-        schedules = snake.data.map((s: any) => ({
+
+      if (!snakeErr && snakeData && snakeData.length > 0) {
+        schedules = snakeData.map((s: any) => ({
           id: s.id,
           enrollmentId: s.enrollment_id,
           lessonNumber: s.lesson_number,
           scheduledAt: s.scheduled_at,
         }));
-      } else if (scheduleErr && !isSchemaError(scheduleErr)) {
-        throw scheduleErr;
+      } else if (snakeErr && !isSchemaError(snakeErr)) {
+        throw snakeErr;
+      } else if (schedErr && !isSchemaError(schedErr)) {
+        throw schedErr;
       }
     }
 
