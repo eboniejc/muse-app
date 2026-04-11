@@ -25,29 +25,35 @@ export async function handle(request: Request) {
     const fromIso = todayStart.toISOString();
 
     let enrollments: any[] = [];
-    let enrollmentErr: any = null;
-    ({ data: enrollments, error: enrollmentErr } = await supabaseAdmin
+
+    // 1. Try camelCase columns
+    const { data: ceData, error: ceErr } = await supabaseAdmin
       .from("courseEnrollments")
       .select("id,courseId,status,userId")
       .eq("userId", user.id as any)
-      .in("status", ["active", "completed"]));
+      .in("status", ["active", "completed"]);
 
-    if (enrollmentErr || !enrollments) {
-      const snake = await supabaseAdmin
-        .from("course_enrollments")
+    if (!ceErr && ceData && ceData.length > 0) {
+      enrollments = ceData;
+    } else {
+      // 2. Same table, snake_case columns (most common Supabase default)
+      const { data: snakeData, error: snakeErr } = await supabaseAdmin
+        .from("courseEnrollments")
         .select("id,course_id,status,user_id")
         .eq("user_id", user.id as any)
         .in("status", ["active", "completed"]);
-      if (snake.error && !isSchemaError(snake.error)) throw snake.error;
-      if (!snake.error && snake.data) {
-        enrollments = snake.data.map((e: any) => ({
+
+      if (!snakeErr && snakeData && snakeData.length > 0) {
+        enrollments = snakeData.map((e: any) => ({
           id: e.id,
-          courseId: e.course_id,
+          courseId: e.course_id ?? e.courseId,
           status: e.status,
-          userId: e.user_id,
+          userId: e.user_id ?? e.userId,
         }));
-      } else if (enrollmentErr && !isSchemaError(enrollmentErr)) {
-        throw enrollmentErr;
+      } else if (snakeErr && !isSchemaError(snakeErr)) {
+        throw snakeErr;
+      } else if (ceErr && !isSchemaError(ceErr)) {
+        throw ceErr;
       }
     }
 
