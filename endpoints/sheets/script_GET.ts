@@ -446,6 +446,13 @@ function _writeLessonsSheet(lessonRows, instructors) {
   // Format date column
   sheet.getRange(2, COL_DATE, values.length, 1).setNumberFormat('dd/mm/yyyy');
 
+  // Date validation is required for Google Sheets to show the calendar picker UI.
+  var dateRule = SpreadsheetApp.newDataValidation()
+    .requireDate()
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, COL_DATE, values.length, 1).setDataValidation(dateRule);
+
   // Read-only columns: grey background (enrollmentId, studentName, email, course, lessonNum, status)
   [COL_ENROLLMENT_ID, COL_STUDENT_NAME, COL_EMAIL, COL_COURSE_NAME, COL_LESSON_NUM, COL_STATUS].forEach(function(col) {
     sheet.getRange(2, col, values.length, 1).setBackground(C.readonly);
@@ -471,14 +478,15 @@ function _writeLessonsSheet(lessonRows, instructors) {
     .build();
   sheet.getRange(2, COL_TIME, values.length, 1).setDataValidation(timeRule);
 
-  // Instructor dropdown from unique instructors list
-  if (instructors.length) {
-    var instrRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(instructors, true)
-      .setAllowInvalid(true) // allow typing a custom name
-      .build();
-    sheet.getRange(2, COL_INSTRUCTOR, values.length, 1).setDataValidation(instrRule);
-  }
+  // Always apply instructor validation so the dropdown UI is available.
+  // When no instructors are configured yet, use a blank placeholder option
+  // and still allow users to type a custom name.
+  var instructorOptions = instructors.length ? instructors : [''];
+  var instrRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(instructorOptions, true)
+    .setAllowInvalid(true) // allow typing a custom name
+    .build();
+  sheet.getRange(2, COL_INSTRUCTOR, values.length, 1).setDataValidation(instrRule);
 }
 
 function _readLessonsSheet() {
