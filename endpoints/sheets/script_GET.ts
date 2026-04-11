@@ -1,60 +1,61 @@
 import { schema } from "./script_GET.schema";
 
-const GOOGLE_APPS_SCRIPT_CONTENT = `/**
- * MUSE INC - Google Sheets Manager (English + Vietnamese)
- * =========================================================
- * SETUP INSTRUCTIONS:
- *   1. Paste this file into Extensions > Apps Script (replace everything)
- *   2. Save (Ctrl+S)
- *   3. Select "installTrigger" in the function dropdown and click Run
- *      - This installs the edit trigger. No popup will appear - check the
- *        Execution Log at the bottom to confirm "Trigger installed OK"
- *   4. Then select "setupSheets" and click Run
- *      - This rebuilds the Calendar and Audit sheets cleanly
- *   5. Done. Go back to the sheet and use normally.
- *
- * DAILY USE:
- *   - MUSE INC Sync menu > Pull From App  (load latest data)
- *   - MUSE INC Sync menu > Push To App    (save changes)
- *   - Monthly Calendar tab: change B2 (month) or D2 (year) -> auto rebuilds
- *   - Audit tab: change B2 (from date) or D2 (to date) -> auto rebuilds
- */
+const GOOGLE_APPS_SCRIPT_CONTENT = `
+// ── MUSE INC Google Sheets Manager ───────────────────────────────────────────
+//
+// SETUP:
+//   1. Paste this into Extensions > Apps Script (replace everything), Save
+//   2. Run "installTrigger" once from the editor
+//   3. Run "setupSheets" once to build the sheet tabs
+//   4. Use MUSE INC Sync menu to Pull / Push
+//
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-var MASTER_SHEET    = 'MasterEnrollments';
+var LESSONS_SHEET   = 'Lessons';
 var EVENTS_SHEET    = 'Events';
 var CAL_SHEET       = 'Monthly Calendar';
 var AUDIT_SHEET     = 'Audit';
-var MAX_LESSONS     = 33;
 var CALENDAR_NAME   = 'MUSE INC Schedule';
 var LESSON_DURATION = 1; // hours
 
-// MasterEnrollments column positions (1-indexed)
-var COL_INSTRUCTOR_NAME  = 11;
-var COL_INSTRUCTOR_EMAIL = 12;
-var COL_LESSON1_DATE     = 13; // +3 per lesson
-var COL_LESSON1_INSTR    = 14; // +3 per lesson
+var TIME_SLOTS = (function() {
+  var slots = [];
+  for (var h = 9; h <= 20; h++) {
+    var ampm = h < 12 ? 'am' : 'pm';
+    var h12  = h <= 12 ? h : h - 12;
+    slots.push(h12 + ':00' + ampm);
+    if (h < 20) slots.push(h12 + ':30' + ampm);
+  }
+  return slots;
+})();
 
 var C = {
-  navy:        '#1a2744',
-  navyMid:     '#2c3e6b',
-  white:       '#ffffff',
-  instrBlue:   '#e8f4fd',
-  overrideYel: '#fff3cd',
-  assignGreen: '#d4edda',
-  altRow:      '#f7f9ff',
-  calBlue:     '#ddeeff',
-  stepsYel:    '#fffbe6',
-  stepsText:   '#5a4000',
-  guideBlue:   '#eef3ff',
-  guideText:   '#1a2744',
-  inputBg:     '#ffffff',
-  labelText:   '#333333',
-  hintText:    '#888888',
+  navy:     '#1a2744',
+  navyMid:  '#2c3e6b',
+  white:    '#ffffff',
+  altRow:   '#f7f9ff',
+  readonly: '#f0f0f0',
+  inputBg:  '#ffffff',
+  calBlue:  '#ddeeff',
+  stepsYel: '#fffbe6',
+  stepsText:'#5a4000',
+  hintText: '#888888',
+  labelText:'#333333',
 };
 
-// ── STEP 1: Install trigger (run this once from the editor) ───────────────────
+// Columns in the Lessons sheet (1-indexed)
+var COL_ENROLLMENT_ID = 1;
+var COL_STUDENT_NAME  = 2;
+var COL_EMAIL         = 3;
+var COL_COURSE_NAME   = 4;
+var COL_LESSON_NUM    = 5;
+var COL_DATE          = 6;
+var COL_TIME          = 7;
+var COL_INSTRUCTOR    = 8;
+var COL_STATUS        = 9;
+var LESSONS_COL_COUNT = 9;
+
+// ── Install trigger ───────────────────────────────────────────────────────────
 
 function installTrigger() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -62,128 +63,18 @@ function installTrigger() {
     if (t.getHandlerFunction() === 'onEditInstallable') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('onEditInstallable').forSpreadsheet(ss).onEdit().create();
-  Logger.log('Trigger installed OK. onEditInstallable will now fire for all edits including dropdowns.');
+  Logger.log('Trigger installed OK.');
 }
 
-// ── STEP 2: Clean and rebuild Calendar + Audit sheets ────────────────────────
+// ── Setup all sheets ──────────────────────────────────────────────────────────
 
 function setupSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  try {
-    var ui = SpreadsheetApp.getUi();
-    var warn = ui.alert(
-      'Rebuild sheets? / Xay dung lai trang tinh?',
-      'EN: This will delete and rebuild the Monthly Calendar and Audit sheets. Any custom content in those tabs will be lost. Continue?\\nVI: Thao tac nay se xoa va xay dung lai trang Monthly Calendar va Audit. Noi dung tuy chinh trong cac tab do se bi mat. Tiep tuc?',
-      ui.ButtonSet.YES_NO
-    );
-    if (warn !== ui.Button.YES) return;
-  } catch(e) {
-    // Running from script editor — UI not available, proceed without confirmation
-  }
-
-  var oldCal = ss.getSheetByName(CAL_SHEET);
-  if (oldCal) ss.deleteSheet(oldCal);
-  var calSheet = ss.insertSheet(CAL_SHEET);
-  _buildCalendarControls(calSheet);
-  renderCalendar(calSheet);
-
-  var oldAud = ss.getSheetByName(AUDIT_SHEET);
-  if (oldAud) ss.deleteSheet(oldAud);
-  var audSheet = ss.insertSheet(AUDIT_SHEET);
-  _buildAuditControls(audSheet);
-  renderAudit(audSheet);
-
-  _instructMaster(ss);
-  _instructEvents(ss);
-  cleanEventsSheet(ss);
-
-  Logger.log('Sheets rebuilt OK. Calendar and Audit are clean with control cells in B2 and D2.');
-}
-
-// ── Clean Events Sheet ────────────────────────────────────────────────────────
-
-function cleanEventsSheet(ss) {
-  var sheet = ss.getSheetByName(EVENTS_SHEET);
-  if (!sheet) return;
-
-  var HEADERS = ['id','title','caption','flyerUrl','startAt','endAt','isActive'];
-  var lastCol = sheet.getLastColumn();
-
-  // Read existing data so we can rewrite cleanly
-  var existingData = sheet.getDataRange().getValues();
-  // Skip instruction banner rows — find the real header row (starts with 'id')
-  var hdrIdx = 0;
-  for (var h = 0; h < Math.min(existingData.length, 6); h++) {
-    if (String(existingData[h][0] || '') === 'id') { hdrIdx = h; break; }
-  }
-  var existingHeaders = existingData.length > 0 ? existingData[hdrIdx].map(String) : [];
-
-  // Remap rows to the correct 7-column order
-  var cleanRows = [];
-  for (var i = hdrIdx + 1; i < existingData.length; i++) {
-    var row = existingData[i];
-    var hasData = row.some(function(v) { return v !== '' && v !== null && v !== undefined; });
-    if (!hasData) continue;
-    cleanRows.push(HEADERS.map(function(h) {
-      var idx = existingHeaders.indexOf(h);
-      return idx >= 0 ? row[idx] : '';
-    }));
-  }
-
-  // Clear the whole sheet and rewrite with exactly 7 columns
-  sheet.clear();
-  var numRows = cleanRows.length + 1;
-  var values = [HEADERS].concat(cleanRows);
-  sheet.getRange(1, 1, numRows, 7).setValues(values);
-
-  // Delete any phantom columns beyond col 7
-  var newLastCol = sheet.getLastColumn();
-  if (newLastCol > 7) sheet.deleteColumns(8, newLastCol - 7);
-
-  // Header row formatting
-  sheet.getRange(1, 1, 1, 7)
-    .setFontWeight('bold')
-    .setBackground(C.navy)
-    .setFontColor(C.white);
-
-  // Header notes
-  var notes = [
-    'EN: Unique event ID (auto-set by app, do not edit)\\nVI: ID su kien (tu dong, khong chinh sua)',
-    'EN: Event title\\nVI: Ten su kien',
-    'EN: Short description shown on event card\\nVI: Mo ta ngan hien thi tren the su kien',
-    'EN: Full image URL (https://...)\\nVI: Link anh day du (https://...)',
-    'EN: Start date/time — format: dd/mm/yy h:mmam/pm e.g. 25/04/26 07:00pm\\nVI: Ngay gio bat dau — dinh dang: dd/mm/yy h:mmam/pm vd: 25/04/26 07:00pm',
-    'EN: End date/time — leave blank for 2hr default\\nVI: Ngay gio ket thuc — de trong = mac dinh 2 gio',
-    'EN: TRUE = visible on app | FALSE = hidden\\nVI: TRUE = hien thi | FALSE = an di'
-  ];
-  for (var c = 0; c < 7; c++) {
-    sheet.getRange(1, c + 1).setNote(notes[c]);
-  }
-
-  // Date format for startAt (col 5) and endAt (col 6)
-  if (cleanRows.length > 0) {
-    sheet.getRange(2, 5, cleanRows.length, 1).setNumberFormat('dd/mm/yy h:mm am/pm');
-    sheet.getRange(2, 6, cleanRows.length, 1).setNumberFormat('dd/mm/yy h:mm am/pm');
-
-    // TRUE/FALSE dropdown for isActive (col 7)
-    var isActiveRule = SpreadsheetApp.newDataValidation()
-      .requireValueInList(['TRUE','FALSE'], true)
-      .setHelpText('EN: TRUE = show event | FALSE = hide event\\nVI: TRUE = hien thi | FALSE = an su kien')
-      .build();
-    sheet.getRange(2, 7, cleanRows.length, 1).setDataValidation(isActiveRule);
-  }
-
-  // Column widths
-  sheet.setColumnWidth(1, 60);   // id
-  sheet.setColumnWidth(2, 200);  // title
-  sheet.setColumnWidth(3, 250);  // caption
-  sheet.setColumnWidth(4, 300);  // flyerUrl
-  sheet.setColumnWidth(5, 160);  // startAt
-  sheet.setColumnWidth(6, 160);  // endAt
-  sheet.setColumnWidth(7, 80);   // isActive
-
-  sheet.setFrozenRows(1);
-  Logger.log('cleanEventsSheet: Events sheet cleaned — ' + cleanRows.length + ' rows, 7 columns.');
+  _ensureLessonsSheet(ss);
+  _ensureEventsSheet(ss);
+  _ensureCalendarSheet(ss);
+  _ensureAuditSheet(ss);
+  Logger.log('Sheets ready.');
 }
 
 // ── Menu ──────────────────────────────────────────────────────────────────────
@@ -191,9 +82,10 @@ function cleanEventsSheet(ss) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('MUSE INC Sync')
-    .addItem('Pull From App',           'pullFromApp')
-    .addItem('Push To App',             'pushToApp')
-    .addItem('Sync to Google Calendar', 'syncToCalendar')
+    .addItem('Pull From App',              'pullFromApp')
+    .addItem('Push To App',               'pushToApp')
+    .addItem('Sync to Google Calendar',   'syncToCalendar')
+    .addItem('Fill Instructor Down',      'fillInstructorDown')
     .addSeparator()
     .addSubMenu(
       SpreadsheetApp.getUi().createMenu('Settings')
@@ -203,15 +95,8 @@ function onOpen() {
     .addToUi();
 }
 
-// ── Simple trigger (fallback for direct typing) ───────────────────────────────
-
-function onEdit(e) { _handleEdit(e); }
-
-// ── Installable trigger (handles dropdowns + date pickers) ────────────────────
-
+function onEdit(e)            { _handleEdit(e); }
 function onEditInstallable(e) { _handleEdit(e); }
-
-// ── Core edit handler ─────────────────────────────────────────────────────────
 
 function _handleEdit(e) {
   if (!e || !e.range) return;
@@ -220,394 +105,55 @@ function _handleEdit(e) {
   var col   = e.range.getColumn();
   var row   = e.range.getRow();
 
-  if (name === MASTER_SHEET) {
-    if (row < 2) return;
-    if (col === COL_INSTRUCTOR_EMAIL) {
-      _handleInstructorAssignment(sheet, row, e.value);
-      return;
-    }
-    for (var i = 0; i < MAX_LESSONS; i++) {
-      if (col === COL_LESSON1_INSTR + (i * 3)) {
-        if (e.value) {
-          e.range.setBackground(C.overrideYel)
-            .setNote('EN: Instructor override for this lesson only.\\nTo revert: clear this cell.\\nVI: Giang vien thay the chi cho buoi hoc nay.\\nDe hoan tac: xoa o nay.');
-        } else {
-          e.range.setBackground(null).clearNote();
-        }
-        return;
-      }
-      if (col === COL_LESSON1_DATE + (i * 3)) {
-        e.range.setNumberFormat('dd/mm/yy h:mm am/pm');
-        return;
-      }
+  if (name === LESSONS_SHEET && row > 1) {
+    // Format date column automatically
+    if (col === COL_DATE) {
+      e.range.setNumberFormat('dd/mm/yyyy');
     }
     return;
   }
 
   if (name === CAL_SHEET && row === 2 && (col === 2 || col === 4)) {
-    var cs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CAL_SHEET);
-    if (cs) renderCalendar(cs);
-    return;
+    renderCalendar(sheet); return;
   }
-
   if (name === AUDIT_SHEET && row === 2 && (col === 2 || col === 4)) {
-    var as = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUDIT_SHEET);
-    if (as) renderAudit(as);
-    return;
+    renderAudit(sheet); return;
   }
 }
 
-// ── Instructor Assignment ─────────────────────────────────────────────────────
+// ── Fill Instructor Down ──────────────────────────────────────────────────────
+// Fills the selected instructor into all empty instructor cells
+// for the same student (same enrollmentId).
 
-function _handleInstructorAssignment(sheet, row, newEmail) {
-  if (!newEmail) return;
-  var instructorName = sheet.getRange(row, COL_INSTRUCTOR_NAME).getValue();
-  var studentName    = sheet.getRange(row, 4).getValue();
-  var label          = instructorName || newEmail;
+function fillInstructorDown() {
+  var ui    = SpreadsheetApp.getUi();
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LESSONS_SHEET);
+  if (!sheet) { ui.alert('No Lessons sheet found.', ui.ButtonSet.OK); return; }
 
-  var ui = SpreadsheetApp.getUi();
-  var res = ui.alert(
-    'Apply instructor to all lessons? / Ap dung cho tat ca buoi hoc?',
-    'EN: Assign ' + label + ' to all empty lesson slots' + (studentName ? ' for ' + studentName : '') + '?\\n' +
-    '  YES = fill all empty lesson instructor cells on this row\\n' +
-    '  NO  = only update the default; lesson cells stay unchanged\\n\\n' +
-    'VI: Phan cong ' + label + ' cho tat ca o giang vien trong' + (studentName ? ' cua ' + studentName : '') + '?\\n' +
-    '  YES = dien vao tat ca o giang vien con trong\\n' +
-    '  NO  = chi cap nhat mac dinh; cac o buoi hoc giu nguyen',
-    ui.ButtonSet.YES_NO
-  );
-  if (res !== ui.Button.YES) return;
+  var active = sheet.getActiveCell();
+  if (active.getColumn() !== COL_INSTRUCTOR || active.getRow() < 2) {
+    ui.alert('Select a cell in the Instructor column first.', ui.ButtonSet.OK);
+    return;
+  }
 
+  var instrValue = active.getValue();
+  if (!instrValue) { ui.alert('The selected instructor cell is empty.', ui.ButtonSet.OK); return; }
+
+  var enrollmentId = sheet.getRange(active.getRow(), COL_ENROLLMENT_ID).getValue();
+  if (!enrollmentId) { ui.alert('No enrollment ID found on this row.', ui.ButtonSet.OK); return; }
+
+  var lastRow = sheet.getLastRow();
+  var data = sheet.getRange(2, COL_ENROLLMENT_ID, lastRow - 1, LESSONS_COL_COUNT).getValues();
   var filled = 0;
-  for (var i = 0; i < MAX_LESSONS; i++) {
-    var cell = sheet.getRange(row, COL_LESSON1_INSTR + (i * 3));
-    if (!cell.getValue()) {
-      cell.setValue(instructorName || newEmail)
-          .setBackground(C.assignGreen)
-          .setNote('EN: Auto-filled ' + new Date().toLocaleDateString() + '\\nVI: Tu dong dien ' + new Date().toLocaleDateString());
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][COL_ENROLLMENT_ID - 1]) !== String(enrollmentId)) continue;
+    var instrCell = sheet.getRange(i + 2, COL_INSTRUCTOR);
+    if (!instrCell.getValue()) {
+      instrCell.setValue(instrValue);
       filled++;
     }
   }
-
-  if (filled === 0) {
-    ui.alert(
-      'No empty slots / Khong co o trong',
-      'EN: All lesson instructor cells already have a value. Edit individual cells to override.\\n' +
-      'VI: Tat ca o giang vien buoi hoc da co gia tri. Chinh sua tung o de thay doi rieng le.',
-      ui.ButtonSet.OK
-    );
-  }
-}
-
-// ── Build Calendar Sheet Layout ───────────────────────────────────────────────
-
-function _buildCalendarControls(sheet) {
-  var r1 = sheet.getRange(1, 1, 1, 7);
-  r1.merge().setValue('MONTHLY CALENDAR  |  LICH THANG')
-    .setBackground(C.navy).setFontColor(C.white)
-    .setFontWeight('bold').setFontSize(14)
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(1, 44);
-
-  sheet.getRange(2, 1).setValue('Month / Thang:')
-    .setFontWeight('bold').setFontColor(C.labelText).setFontSize(11);
-
-  var MONTHS = ['January','February','March','April','May','June',
-                'July','August','September','October','November','December'];
-  var now  = new Date();
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(MONTHS, true)
-    .setHelpText('Pick a month / Chon thang').build();
-  sheet.getRange('B2')
-    .setDataValidation(rule).setValue(MONTHS[now.getMonth()])
-    .setBackground(C.inputBg).setFontWeight('bold').setFontSize(12)
-    .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID)
-    .setNote('EN: Change this to switch month. Calendar updates automatically.\\nVI: Thay doi de doi thang. Lich tu dong cap nhat.');
-
-  sheet.getRange(2, 3).setValue('Year / Nam:')
-    .setFontWeight('bold').setFontColor(C.labelText).setFontSize(11);
-  sheet.getRange('D2')
-    .setValue(now.getFullYear()).setNumberFormat('0')
-    .setBackground(C.inputBg).setFontWeight('bold').setFontSize(12)
-    .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID)
-    .setNote('EN: Change this to switch year. Calendar updates automatically.\\nVI: Thay doi de doi nam. Lich tu dong cap nhat.');
-
-  sheet.getRange(2, 5, 1, 3).merge()
-    .setValue('EN: Change month or year above - calendar updates automatically\\nVI: Thay doi thang hoac nam - lich tu dong cap nhat')
-    .setFontColor(C.hintText).setFontStyle('italic').setFontSize(10).setWrap(true);
-  sheet.setRowHeight(2, 40);
-
-  var r3 = sheet.getRange(3, 1, 1, 7);
-  r3.merge()
-    .setValue(
-      'EN: Days highlighted blue have lessons. Each day shows: time, student, course, instructor.\\n' +
-      'VI: Ngay duoc to xanh co buoi hoc. Moi ngay hien thi: gio, hoc vien, khoa hoc, giang vien.'
-    )
-    .setBackground(C.stepsYel).setFontColor(C.stepsText)
-    .setFontSize(10).setWrap(true).setVerticalAlignment('middle');
-  sheet.setRowHeight(3, 44);
-
-  sheet.setFrozenRows(3);
-  for (var c = 1; c <= 7; c++) sheet.setColumnWidth(c, 155);
-}
-
-// ── Build Audit Sheet Layout ──────────────────────────────────────────────────
-
-function _buildAuditControls(sheet) {
-  var r1 = sheet.getRange(1, 1, 1, 5);
-  r1.merge().setValue('INSTRUCTOR AUDIT  |  BAO CAO GIANG VIEN')
-    .setBackground(C.navy).setFontColor(C.white)
-    .setFontWeight('bold').setFontSize(14)
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(1, 44);
-
-  var now          = new Date();
-  var firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  var lastOfMonth  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  sheet.getRange(2, 1).setValue('From / Tu ngay:')
-    .setFontWeight('bold').setFontColor(C.labelText).setFontSize(11);
-  sheet.getRange('B2')
-    .setValue(firstOfMonth).setNumberFormat('dd/mm/yyyy')
-    .setBackground(C.inputBg).setFontWeight('bold').setFontSize(12)
-    .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID)
-    .setNote('EN: Set start date for the report. Format: dd/mm/yyyy\\nVI: Nhap ngay bat dau. Dinh dang: dd/mm/yyyy');
-
-  sheet.getRange(2, 3).setValue('To / Den ngay:')
-    .setFontWeight('bold').setFontColor(C.labelText).setFontSize(11);
-  sheet.getRange('D2')
-    .setValue(lastOfMonth).setNumberFormat('dd/mm/yyyy')
-    .setBackground(C.inputBg).setFontWeight('bold').setFontSize(12)
-    .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID)
-    .setNote('EN: Set end date for the report. Format: dd/mm/yyyy\\nVI: Nhap ngay ket thuc. Dinh dang: dd/mm/yyyy');
-
-  sheet.getRange(2, 5)
-    .setValue('Change dates above - report updates automatically / Thay doi ngay - bao cao tu dong cap nhat')
-    .setFontColor(C.hintText).setFontStyle('italic').setFontSize(10).setWrap(true);
-  sheet.setRowHeight(2, 40);
-
-  var r3 = sheet.getRange(3, 1, 1, 5);
-  r3.merge()
-    .setValue(
-      'EN: Shows lessons per instructor for the date range. Cancelled lessons excluded automatically.\\n' +
-      'VI: Hien thi so buoi hoc moi giang vien trong khoang thoi gian. Buoi hoc da huy tu dong bi loai tru.'
-    )
-    .setBackground(C.stepsYel).setFontColor(C.stepsText)
-    .setFontSize(10).setWrap(true).setVerticalAlignment('middle');
-  sheet.setRowHeight(3, 44);
-
-  sheet.setFrozenRows(3);
-}
-
-// ── Render Calendar Grid ──────────────────────────────────────────────────────
-
-function renderCalendar(sheet) {
-  var MONTHS = ['January','February','March','April','May','June',
-                'July','August','September','October','November','December'];
-  var DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-  var monthVal = sheet.getRange('B2').getValue();
-  var yearVal  = sheet.getRange('D2').getValue();
-  var month    = MONTHS.indexOf(String(monthVal).trim()) + 1;
-  var year     = parseInt(yearVal, 10);
-
-  if (!month || !year || year < 2000 || year > 2100) {
-    Logger.log('renderCalendar: invalid month=' + monthVal + ' year=' + yearVal);
-    return;
-  }
-
-  var lessonsByDay = {};
-  try {
-    var rows = readSheetRows(MASTER_SHEET);
-    rows.forEach(function(row) {
-      for (var i = 1; i <= MAX_LESSONS; i++) {
-        if ((row['lesson' + i + 'Status'] || '').toLowerCase() === 'cancelled') continue;
-        var dtVal = row['lesson' + i + 'DateTime'];
-        if (!dtVal) continue;
-        var dt = new Date(dtVal);
-        if (isNaN(dt.getTime())) continue;
-        if (dt.getFullYear() !== year || dt.getMonth() + 1 !== month) continue;
-        var key = String(dt.getDate());
-        var h = dt.getHours(), m = dt.getMinutes();
-        var t = (h % 12 || 12) + ':' + String(m).padStart(2, '0') + (h >= 12 ? 'pm' : 'am');
-        var instr = row['lesson' + i + 'Instructor'] || row.instructorName || '';
-        if (!lessonsByDay[key]) lessonsByDay[key] = [];
-        lessonsByDay[key].push({ time: t, student: row.studentName || '?', course: row.courseName || '', instructor: instr });
-      }
-    });
-    Object.keys(lessonsByDay).forEach(function(k) {
-      lessonsByDay[k].sort(function(a, b) { return a.time < b.time ? -1 : 1; });
-    });
-  } catch(err) {
-    Logger.log('renderCalendar: error reading lessons - ' + err.message);
-  }
-
-  var daysInMonth = new Date(year, month, 0).getDate();
-  var startDow    = new Date(year, month - 1, 1).getDay();
-  var weeks = [], week = [];
-  for (var p = 0; p < startDow; p++) week.push(0);
-  for (var d = 1; d <= daysInMonth; d++) {
-    week.push(d);
-    if (week.length === 7) { weeks.push(week); week = []; }
-  }
-  while (week.length > 0 && week.length < 7) week.push(0);
-  if (week.length) weeks.push(week);
-
-  var lastRow = Math.max(sheet.getLastRow(), 12);
-  if (lastRow >= 4) sheet.getRange(4, 1, lastRow - 3, 7).clearContent().clearFormat();
-
-  DAYS.forEach(function(name, col) {
-    sheet.getRange(4, col + 1).setValue(name)
-      .setBackground(C.navyMid).setFontColor(C.white)
-      .setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle');
-  });
-  sheet.setRowHeight(4, 28);
-
-  weeks.forEach(function(wk, wkIdx) {
-    var sheetRow   = wkIdx + 5;
-    var maxLessons = 0;
-    wk.forEach(function(day) {
-      if (day && lessonsByDay[String(day)]) maxLessons = Math.max(maxLessons, lessonsByDay[String(day)].length);
-    });
-    sheet.setRowHeight(sheetRow, Math.max(72, 36 + maxLessons * 22));
-
-    wk.forEach(function(day, colIdx) {
-      var cell = sheet.getRange(sheetRow, colIdx + 1);
-      if (!day) { cell.setBackground('#f5f5f5'); return; }
-
-      var lessons = lessonsByDay[String(day)] || [];
-      var lines   = [String(day)];
-      lessons.forEach(function(l) {
-        lines.push(l.time + '  ' + l.student);
-        if (l.course) lines.push('  ' + l.course + (l.instructor ? ' - ' + l.instructor : ''));
-      });
-
-      cell.setValue(lines.join('\\n')).setWrap(true).setVerticalAlignment('top')
-          .setBackground(lessons.length ? C.calBlue : C.white)
-          .setBorder(true, true, true, true, false, false, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
-
-      try {
-        var rt = SpreadsheetApp.newRichTextValue().setText(lines.join('\\n'))
-          .setTextStyle(0, 1, SpreadsheetApp.newTextStyle().setBold(true).setFontSize(11).build())
-          .build();
-        cell.setRichTextValue(rt);
-      } catch(err) {}
-    });
-  });
-}
-
-// ── Render Audit Report ───────────────────────────────────────────────────────
-
-function renderAudit(sheet) {
-  var fromVal = sheet.getRange('B2').getValue();
-  var toVal   = sheet.getRange('D2').getValue();
-  if (!fromVal || !toVal) return;
-
-  var startDate = new Date(fromVal); startDate.setHours(0, 0, 0, 0);
-  var endDate   = new Date(toVal);   endDate.setHours(23, 59, 59, 999);
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
-
-  var byInstructor = {};
-  try {
-    var rows = readSheetRows(MASTER_SHEET);
-    rows.forEach(function(row) {
-      for (var i = 1; i <= MAX_LESSONS; i++) {
-        if ((row['lesson' + i + 'Status'] || '').toLowerCase() === 'cancelled') continue;
-        var dtVal = row['lesson' + i + 'DateTime'];
-        if (!dtVal) continue;
-        var dt = new Date(dtVal);
-        if (isNaN(dt.getTime()) || dt < startDate || dt > endDate) continue;
-        var instr = (row['lesson' + i + 'Instructor'] || row.instructorName || 'Unassigned').trim();
-        if (!byInstructor[instr]) byInstructor[instr] = [];
-        byInstructor[instr].push({ student: row.studentName || '', course: row.courseName || '', num: i, date: dt });
-      }
-    });
-  } catch(err) {
-    Logger.log('renderAudit: error - ' + err.message);
-    return;
-  }
-
-  var lastRow = Math.max(sheet.getLastRow(), 10);
-  if (lastRow >= 4) sheet.getRange(4, 1, lastRow - 3, 5).clearContent().clearFormat();
-
-  var instructors = Object.keys(byInstructor).sort();
-  var total = instructors.reduce(function(s, n) { return s + byInstructor[n].length; }, 0);
-  var r = 4;
-
-  if (instructors.length === 0) {
-    sheet.getRange(r, 1, 1, 5).merge()
-      .setValue('EN: No lessons found for this date range.\\nVI: Khong tim thay buoi hoc nao trong khoang thoi gian nay.')
-      .setFontStyle('italic').setFontColor(C.hintText).setWrap(true);
-    return;
-  }
-
-  sheet.getRange(r, 1, 1, 3)
-    .setValues([['Instructor / Giang vien', 'Lessons / So buoi', 'Period / Khoang thoi gian']])
-    .setBackground(C.navyMid).setFontColor(C.white).setFontWeight('bold');
-  sheet.setRowHeight(r, 28); r++;
-
-  var tz = Session.getScriptTimeZone();
-  var period = Utilities.formatDate(startDate, tz, 'dd/MM/yyyy') + ' - ' + Utilities.formatDate(endDate, tz, 'dd/MM/yyyy');
-
-  instructors.forEach(function(name) {
-    sheet.getRange(r, 1, 1, 3).setValues([[name, byInstructor[name].length, period]])
-      .setBackground(r % 2 === 0 ? C.altRow : C.white);
-    r++;
-  });
-
-  sheet.getRange(r, 1, 1, 2).setValues([['TOTAL / TONG', total]])
-    .setFontWeight('bold').setBackground(C.instrBlue);
-  r += 2;
-
-  sheet.getRange(r, 1, 1, 5)
-    .setValues([['Instructor / Giang vien', 'Student / Hoc vien', 'Course / Khoa hoc', 'Lesson', 'Date & Time / Ngay gio']])
-    .setBackground(C.navyMid).setFontColor(C.white).setFontWeight('bold');
-  sheet.setRowHeight(r, 28); r++;
-
-  instructors.forEach(function(name) {
-    var lessons = byInstructor[name].slice().sort(function(a, b) { return a.date - b.date; });
-    lessons.forEach(function(l) {
-      sheet.getRange(r, 1, 1, 5).setValues([[name, l.student, l.course, 'Lesson ' + l.num, l.date]])
-        .setBackground(r % 2 === 0 ? C.altRow : C.white);
-      sheet.getRange(r, 5).setNumberFormat('dd/mm/yy h:mm am/pm');
-      r++;
-    });
-    sheet.getRange(r, 1, 1, 2).setValues([['Subtotal: ' + name, lessons.length]])
-      .setFontWeight('bold').setBackground(C.instrBlue);
-    r++;
-  });
-
-  sheet.autoResizeColumns(1, 5);
-}
-
-// ── Setup ─────────────────────────────────────────────────────────────────────
-
-function setup() {
-  var ui    = SpreadsheetApp.getUi();
-  var props = PropertiesService.getScriptProperties();
-  var urlRes = ui.prompt('Setup (1/2)',
-    'EN: Enter your Muse App URL (e.g. https://myapp.example.com)\\nVI: Nhap URL ung dung Muse',
-    ui.ButtonSet.OK_CANCEL);
-  if (urlRes.getSelectedButton() !== ui.Button.OK) return;
-  var keyRes = ui.prompt('Setup (2/2)',
-    'EN: Enter your API Key\\nVI: Nhap API Key',
-    ui.ButtonSet.OK_CANCEL);
-  if (keyRes.getSelectedButton() !== ui.Button.OK) return;
-  props.setProperty('APP_URL', urlRes.getResponseText().trim().replace(/\\/$/, ''));
-  props.setProperty('API_KEY', keyRes.getResponseText().trim());
-  ui.alert('Done / Hoan tat', 'EN: Connection saved.\\nVI: Da luu ket noi.', ui.ButtonSet.OK);
-}
-
-function setupCalendar() {
-  var ui    = SpreadsheetApp.getUi();
-  var props = PropertiesService.getScriptProperties();
-  var cals  = CalendarApp.getCalendarsByName(CALENDAR_NAME);
-  var cal   = cals.length ? cals[0] : CalendarApp.createCalendar(CALENDAR_NAME, { color: CalendarApp.Color.TEAL });
-  props.setProperty('CALENDAR_ID', cal.getId());
-  ui.alert('Done / Hoan tat',
-    'EN: Calendar ready: ' + CALENDAR_NAME + '\\nShare it with instructors via Google Calendar settings.\\n\\n' +
-    'VI: Lich san sang: ' + CALENDAR_NAME + '\\nChia se voi giang vien qua cai dat Google Calendar.',
-    ui.ButtonSet.OK);
+  ui.alert('Done', 'Filled ' + filled + ' empty instructor cells for this student.', ui.ButtonSet.OK);
 }
 
 // ── Pull From App ─────────────────────────────────────────────────────────────
@@ -618,55 +164,38 @@ function pullFromApp() {
   var appUrl = props.getProperty('APP_URL');
   var apiKey = props.getProperty('API_KEY');
   if (!appUrl || !apiKey) {
-    ui.alert('Not configured', 'EN: Run MUSE INC Sync > Settings > Setup App Connection first.\\nVI: Chay MUSE INC Sync > Settings > Setup App Connection truoc.', ui.ButtonSet.OK);
+    ui.alert('Not configured', 'Run MUSE INC Sync > Settings > Setup App Connection first.', ui.ButtonSet.OK);
     return;
   }
   try {
-    var existingById = {};
-    try { readSheetRows(MASTER_SHEET).forEach(function(r) { if (r.enrollmentId) existingById[String(r.enrollmentId)] = r; }); } catch(e) {}
-
-    var res = UrlFetchApp.fetch(appUrl + '/_api/sheets/export', { method: 'post', headers: { 'x-api-key': apiKey }, muteHttpExceptions: true });
+    var res = UrlFetchApp.fetch(appUrl + '/_api/sheets/export', {
+      method: 'post',
+      headers: { 'x-api-key': apiKey },
+      muteHttpExceptions: true
+    });
     if (res.getResponseCode() !== 200) throw new Error('Export failed ' + res.getResponseCode() + ': ' + res.getContentText());
 
-    var parsed        = parseSuperJSON(res.getContentText());
-    var enrollments   = (parsed && parsed.data && parsed.data.flattenedEnrollments) || [];
-    var events        = (parsed && parsed.data && parsed.data.events)               || [];
-    var cancellations = (parsed && parsed.data && parsed.data.lessonCancellations)  || [];
+    var parsed      = parseSuperJSON(res.getContentText());
+    var lessonRows  = (parsed && parsed.data && parsed.data.lessonRows)  || [];
+    var events      = (parsed && parsed.data && parsed.data.events)      || [];
+    var cancellations = (parsed && parsed.data && parsed.data.lessonCancellations) || [];
 
-    // Safety check: if the app returned 0 enrollments but the sheet has data,
-    // something went wrong on the server — abort rather than wiping the sheet.
-    var existingCount = Object.keys(existingById).length;
-    if (enrollments.length === 0 && existingCount > 0) {
-      throw new Error('EN: Server returned 0 enrollments but sheet has ' + existingCount + ' rows. Aborting to protect your data. Check the app server.\\nVI: May chu tra ve 0 don dang ky nhung bang tinh co ' + existingCount + ' dong. Huy bo de bao ve du lieu.');
+    if (lessonRows.length === 0) {
+      var ok = ui.alert('Warning', 'Server returned 0 lesson rows. Sheet will be empty. Continue?', ui.ButtonSet.YES_NO);
+      if (ok !== ui.Button.YES) return;
     }
 
-    var merged = enrollments.map(function(row) {
-      var ex = existingById[String(row.enrollmentId || '')];
-      if (!ex) return row;
-      var emailMatch = !ex.email || !row.email || ex.email === row.email;
-      var nameMatch  = !ex.studentName || !row.studentName || ex.studentName === row.studentName;
-      if (!emailMatch && !nameMatch) return row;
-      var out = {}; Object.keys(row).forEach(function(k) { out[k] = row[k]; });
-      ['instructorId','instructorName','instructorEmail'].forEach(function(f) { if (!out[f] && ex[f]) out[f] = ex[f]; });
-      for (var i = 1; i <= MAX_LESSONS; i++) {
-        var ins = 'lesson'+i+'Instructor';
-        // Lesson date/time and status must follow the app state so cleared lessons stay cleared after pull.
-        if (!out[ins] && ex[ins]) out[ins] = ex[ins];
-      }
-      return out;
-    });
+    // Build instructor list for dropdown
+    var instructors = _extractInstructors(lessonRows);
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    writeSheetRows(MASTER_SHEET, buildEnrollmentHeaders(), merged);
-    _instructMaster(ss);
-    writeSheetRows(EVENTS_SHEET, buildEventHeaders(), events);
-    cleanEventsSheet(ss);
-    _instructEvents(ss);
-    if (cancellations.length) writeSheetRows('Cancellations', buildCancellationHeaders(), cancellations);
+    _writeLessonsSheet(lessonRows, instructors);
+    _writeEventsSheet(events);
+    _ensureCalendarSheet(SpreadsheetApp.getActiveSpreadsheet());
+    _ensureAuditSheet(SpreadsheetApp.getActiveSpreadsheet());
+    if (cancellations.length) _writeCancellationsSheet(cancellations);
 
-    ui.alert('Pull complete / Hoan tat',
-      'EN: ' + merged.length + ' enrollments, ' + events.length + ' events loaded.\\n' +
-      'VI: Da tai ' + merged.length + ' dang ky, ' + events.length + ' su kien.',
+    ui.alert('Pull complete',
+      lessonRows.length + ' lesson rows, ' + events.length + ' events loaded.',
       ui.ButtonSet.OK);
   } catch(err) { ui.alert('Pull failed', err.message, ui.ButtonSet.OK); }
 }
@@ -679,35 +208,45 @@ function pushToApp() {
   var appUrl = props.getProperty('APP_URL');
   var apiKey = props.getProperty('API_KEY');
   if (!appUrl || !apiKey) {
-    ui.alert('Not configured', 'EN: Run MUSE INC Sync > Settings > Setup App Connection first.\\nVI: Chay MUSE INC Sync > Settings > Setup App Connection truoc.', ui.ButtonSet.OK);
+    ui.alert('Not configured', 'Run MUSE INC Sync > Settings > Setup App Connection first.', ui.ButtonSet.OK);
     return;
   }
   try {
-    var enrollments = readSheetRows(MASTER_SHEET);
-    var events      = readSheetRows(EVENTS_SHEET, true);
-    try {
-      var confirm = ui.alert(
-        'Confirm Push / Xac nhan gui du lieu',
-        'EN: This will send ' + enrollments.length + ' enrollments and ' + events.length + ' events to the live app. Continue?\\nVI: Thao tac nay se gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien len ung dung. Tiep tuc?',
-        ui.ButtonSet.YES_NO
-      );
-      if (confirm !== ui.Button.YES) return;
-    } catch(e) { /* Running from script editor — skip confirmation */ }
-    var r1 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', { method: 'post', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, payload: JSON.stringify({ json: { table: 'flattenedEnrollments', rows: enrollments } }), muteHttpExceptions: true });
-    if (r1.getResponseCode() !== 200) throw new Error('Enrollments push failed: ' + r1.getContentText());
-    var r2 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', { method: 'post', headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }, payload: JSON.stringify({ json: { table: 'events', rows: events } }), muteHttpExceptions: true });
+    var lessonRows = _readLessonsSheet();
+    var events     = _readEventsSheet();
+
+    var confirm = ui.alert(
+      'Confirm Push',
+      'Send ' + lessonRows.length + ' lesson rows and ' + events.length + ' events to the app. Continue?',
+      ui.ButtonSet.YES_NO
+    );
+    if (confirm !== ui.Button.YES) return;
+
+    var r1 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', {
+      method: 'post',
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      payload: JSON.stringify({ json: { table: 'lessonRows', rows: lessonRows } }),
+      muteHttpExceptions: true
+    });
+    if (r1.getResponseCode() !== 200) throw new Error('Lessons push failed: ' + r1.getContentText());
+
+    var r2 = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', {
+      method: 'post',
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      payload: JSON.stringify({ json: { table: 'events', rows: events } }),
+      muteHttpExceptions: true
+    });
     if (r2.getResponseCode() !== 200) throw new Error('Events push failed: ' + r2.getContentText());
+
     var calId = props.getProperty('CALENDAR_ID');
     if (calId) {
-      var choice = ui.alert('Push complete / Hoan tat',
-        'EN: ' + enrollments.length + ' enrollments and ' + events.length + ' events sent. Sync to Google Calendar now?\\n' +
-        'VI: Da gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien. Dong bo Google Calendar?',
+      var choice = ui.alert('Push complete',
+        lessonRows.length + ' lessons and ' + events.length + ' events sent. Sync to Google Calendar now?',
         ui.ButtonSet.YES_NO);
       if (choice === ui.Button.YES) { syncToCalendar(); syncEventsToCalendar(); }
     } else {
-      ui.alert('Push complete / Hoan tat',
-        'EN: ' + enrollments.length + ' enrollments and ' + events.length + ' events sent.\\n' +
-        'VI: Da gui ' + enrollments.length + ' dang ky va ' + events.length + ' su kien.',
+      ui.alert('Push complete',
+        lessonRows.length + ' lessons and ' + events.length + ' events sent.',
         ui.ButtonSet.OK);
     }
   } catch(err) { ui.alert('Push failed', err.message, ui.ButtonSet.OK); }
@@ -725,44 +264,54 @@ function syncToCalendar() {
   var calendar = CalendarApp.getCalendarById(calId);
   if (!calendar) { ui.alert('Calendar not found', 'Run Setup Google Calendar again.', ui.ButtonSet.OK); return; }
 
-  var rows = readSheetRows(MASTER_SHEET);
+  var rows = _readLessonsSheet();
   var created = 0, updated = 0;
 
   rows.forEach(function(row) {
-    var sName = row.studentName || 'Unknown', sEmail = row.email || '';
-    var cName = row.courseName  || 'Unknown', iName  = row.instructorName || '', iEmail = row.instructorEmail || '';
+    if (!row.scheduledAt) return;
+    var start = new Date(row.scheduledAt);
+    if (isNaN(start.getTime())) return;
+    var end   = new Date(start.getTime() + LESSON_DURATION * 3600000);
+
     var eId   = row.enrollmentId;
-    for (var i = 1; i <= MAX_LESSONS; i++) {
-      var dtVal = row['lesson'+i+'DateTime']; if (!dtVal) continue;
-      var lessonInstr = row['lesson'+i+'Instructor'] || iName;
-      var start = new Date(dtVal); if (isNaN(start.getTime())) continue;
-      var end   = new Date(start.getTime() + LESSON_DURATION * 3600000);
-      var tag   = '[muse:'+eId+':'+i+']';
-      var title = cName + ' - Lesson ' + i + ' | ' + sName;
-      var cancelUrl = (appUrl && apiKey) ? makeCancelLink(appUrl, apiKey, eId, i) : '';
-      var lines = ['Student: '+sName, 'Course: '+cName, 'Lesson: '+i+' of '+(row.totalLessons||MAX_LESSONS)];
-      if (lessonInstr) lines.push('Instructor: '+lessonInstr);
-      if (cancelUrl) lines.push('', 'Cancel: '+cancelUrl);
-      lines.push('', tag);
-      var guests = [iEmail, sEmail, 'museincproperty@gmail.com'].filter(Boolean);
-      var ds = new Date(start); ds.setHours(0,0,0,0);
-      var de = new Date(start); de.setHours(23,59,59,999);
-      var existing = calendar.getEvents(ds, de).filter(function(ev) { return ev.getDescription().indexOf(tag) !== -1; });
-      if (existing.length) {
-        var ev = existing[0]; ev.setTitle(title); ev.setTime(start, end); ev.setDescription(lines.join('\\n'));
-        var ge = ev.getGuestList().map(function(g) { return g.getEmail(); });
-        guests.forEach(function(em) { if (ge.indexOf(em) === -1) ev.addGuest(em); });
-        updated++;
-      } else {
-        var opts = { description: lines.join('\\n') }; if (guests.length) opts.guests = guests.join(',');
-        calendar.createEvent(title, start, end, opts); created++;
-      }
+    var lessonNum = row.lessonNumber;
+    var tag   = '[muse:' + eId + ':' + lessonNum + ']';
+    var title = (row.courseName || 'Lesson') + ' - Lesson ' + lessonNum + ' | ' + (row.studentName || '');
+
+    var cancelUrl = (appUrl && apiKey) ? makeCancelLink(appUrl, apiKey, eId, lessonNum) : '';
+    var lines = [
+      'Student: ' + (row.studentName || ''),
+      'Course: ' + (row.courseName || ''),
+      'Lesson: ' + lessonNum
+    ];
+    if (row.instructor) lines.push('Instructor: ' + row.instructor);
+    if (cancelUrl) lines.push('', 'Cancel: ' + cancelUrl);
+    lines.push('', tag);
+
+    var guests = [row.email, 'museincproperty@gmail.com'].filter(Boolean);
+
+    var ds = new Date(start); ds.setHours(0,0,0,0);
+    var de = new Date(start); de.setHours(23,59,59,999);
+    var existing = calendar.getEvents(ds, de).filter(function(ev) {
+      return ev.getDescription().indexOf(tag) !== -1;
+    });
+
+    if (existing.length) {
+      var ev = existing[0];
+      ev.setTitle(title); ev.setTime(start, end); ev.setDescription(lines.join('\\n'));
+      var ge = ev.getGuestList().map(function(g) { return g.getEmail(); });
+      guests.forEach(function(em) { if (ge.indexOf(em) === -1) ev.addGuest(em); });
+      updated++;
+    } else {
+      var opts = { description: lines.join('\\n') };
+      if (guests.length) opts.guests = guests.join(',');
+      calendar.createEvent(title, start, end, opts);
+      created++;
     }
   });
 
-  ui.alert('Calendar sync complete / Hoan tat',
-    'EN: Created '+created+' | Updated '+updated+'\\n'+(created+updated > 0 ? 'Instructors invited as guests.\\n' : 'No scheduled lessons found.\\n')+
-    'VI: Da tao '+created+' | Da cap nhat '+updated,
+  ui.alert('Calendar sync complete',
+    'Created ' + created + ' | Updated ' + updated,
     ui.ButtonSet.OK);
 }
 
@@ -770,178 +319,518 @@ function syncEventsToCalendar() {
   var props = PropertiesService.getScriptProperties();
   var calId = props.getProperty('CALENDAR_ID'); if (!calId) return;
   var calendar = CalendarApp.getCalendarById(calId); if (!calendar) return;
-  readSheetRows(EVENTS_SHEET, true).forEach(function(row) {
+  _readEventsSheet().forEach(function(row) {
     if (!row.title || !row.startAt) return;
     var start = new Date(row.startAt); if (isNaN(start.getTime())) return;
     var end = row.endAt ? new Date(row.endAt) : new Date(start.getTime() + 7200000);
-    var tag = '[muse_event:'+row.id+']';
+    var tag = '[muse_event:' + row.id + ']';
     var desc = (row.caption || '') + '\\n' + tag;
-    var ds = new Date(start); ds.setHours(0,0,0,0); var de = new Date(start); de.setHours(23,59,59,999);
+    var ds = new Date(start); ds.setHours(0,0,0,0);
+    var de = new Date(start); de.setHours(23,59,59,999);
     var ex = calendar.getEvents(ds, de).filter(function(ev) { return ev.getDescription().indexOf(tag) !== -1; });
-    var eventGuests = 'museincproperty@gmail.com';
-    if (ex.length) { ex[0].setTitle(row.title); ex[0].setTime(start, end); ex[0].setDescription(desc); ex[0].addGuest(eventGuests); }
-    else calendar.createEvent(row.title, start, end, { description: desc, guests: eventGuests });
+    var guests = 'museincproperty@gmail.com';
+    if (ex.length) { ex[0].setTitle(row.title); ex[0].setTime(start, end); ex[0].setDescription(desc); ex[0].addGuest(guests); }
+    else calendar.createEvent(row.title, start, end, { description: desc, guests: guests });
   });
 }
 
-// ── In-sheet instructions ─────────────────────────────────────────────────────
+// ── Settings ──────────────────────────────────────────────────────────────────
 
-function _instructMaster(ss) {
-  var sheet = ss.getSheetByName(MASTER_SHEET);
-  if (!sheet) return;
-  if (String(sheet.getRange(1,1).getValue()).indexOf('MASTER ENROLLMENTS') !== -1) return;
-  sheet.insertRowsBefore(1, 3);
-
-  sheet.getRange(1,1,1,12).merge()
-    .setValue('MASTER ENROLLMENTS  |  QUAN LY DANG KY HOC')
-    .setBackground(C.navy).setFontColor(C.white).setFontWeight('bold').setFontSize(13)
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(1, 44);
-
-  sheet.getRange(2,1,1,12).merge()
-    .setValue(
-      'EN: WORKFLOW: 1. Pull From App  2. Type instructor email in blue instructorEmail column (say YES to fill all lessons)  ' +
-      '3. To change one lesson only - edit that lesson instructor cell directly (turns yellow)  ' +
-      '4. Enter lesson dates in lessonNDateTime columns (format: dd/mm/yy 9:00am)  5. Push To App\\n' +
-      'VI: QUY TRINH: 1. Pull From App  2. Nhap email giang vien vao cot instructorEmail mau xanh (nhan YES de dien tat ca)  ' +
-      '3. De thay doi mot buoi - chinh sua o giang vien buoi do truc tiep (chuyen vang)  ' +
-      '4. Nhap ngay gio vao cot lessonNDateTime (dinh dang: dd/mm/yy 9:00am)  5. Push To App'
-    )
-    .setBackground(C.stepsYel).setFontColor(C.stepsText).setFontSize(10).setWrap(true).setVerticalAlignment('middle');
-  sheet.setRowHeight(2, 70);
-
-  sheet.getRange(3,1,1,12).merge()
-    .setValue(
-      'EN: Blue columns = instructor fields (edit these)  |  lessonNDateTime = lesson date/time  |  ' +
-      'lessonNInstructor = leave blank for default, type to override one lesson (turns yellow)  |  lessonNStatus = do NOT edit (set by app)\\n' +
-      'VI: Cot xanh = truong giang vien (chinh sua o day)  |  lessonNDateTime = ngay gio buoi hoc  |  ' +
-      'lessonNInstructor = de trong cho mac dinh, nhap ten de thay doi mot buoi (chuyen vang)  |  lessonNStatus = KHONG chinh sua'
-    )
-    .setBackground(C.guideBlue).setFontColor(C.guideText).setFontSize(10).setWrap(true).setVerticalAlignment('middle');
-  sheet.setRowHeight(3, 60);
-
-  sheet.setFrozenRows(4);
+function setup() {
+  var ui    = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var urlRes = ui.prompt('Setup (1/2)', 'Enter your Muse App URL (e.g. https://myapp.example.com)', ui.ButtonSet.OK_CANCEL);
+  if (urlRes.getSelectedButton() !== ui.Button.OK) return;
+  var keyRes = ui.prompt('Setup (2/2)', 'Enter your API Key', ui.ButtonSet.OK_CANCEL);
+  if (keyRes.getSelectedButton() !== ui.Button.OK) return;
+  props.setProperty('APP_URL', urlRes.getResponseText().trim().replace(/\\/$/, ''));
+  props.setProperty('API_KEY', keyRes.getResponseText().trim());
+  ui.alert('Done', 'Connection saved.', ui.ButtonSet.OK);
 }
 
-function _instructEvents(ss) {
-  var sheet = ss.getSheetByName(EVENTS_SHEET);
-  if (!sheet) return;
-  if (String(sheet.getRange(1,1).getValue()).indexOf('EVENTS') !== -1) return;
-  sheet.insertRowsBefore(1, 2);
-
-  sheet.getRange(1,1,1,7).merge()
-    .setValue('EVENTS  |  SU KIEN')
-    .setBackground(C.navy).setFontColor(C.white).setFontWeight('bold').setFontSize(13)
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(1, 44);
-
-  sheet.getRange(2,1,1,7).merge()
-    .setValue(
-      'EN: title=event name | caption=short description | flyerUrl=image URL (https://...) | ' +
-      'startAt/endAt=date time (dd/mm/yy h:mmam/pm e.g. 25/04/26 07:00pm) leave endAt blank for 2hr default | isActive=TRUE to show, FALSE to hide\\n' +
-      'VI: title=ten su kien | caption=mo ta ngan | flyerUrl=link anh (https://...) | ' +
-      'startAt/endAt=ngay gio (dd/mm/yy h:mmam/pm vd: 25/04/26 07:00pm) de trong endAt=mac dinh 2 gio | isActive=TRUE hien thi, FALSE an di'
-    )
-    .setBackground(C.stepsYel).setFontColor(C.stepsText).setFontSize(10).setWrap(true).setVerticalAlignment('middle');
-  sheet.setRowHeight(2, 70);
-  sheet.setFrozenRows(2);
+function setupCalendar() {
+  var ui    = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var cals  = CalendarApp.getCalendarsByName(CALENDAR_NAME);
+  var cal   = cals.length ? cals[0] : CalendarApp.createCalendar(CALENDAR_NAME, { color: CalendarApp.Color.TEAL });
+  props.setProperty('CALENDAR_ID', cal.getId());
+  ui.alert('Done', 'Calendar ready: ' + CALENDAR_NAME + '\\nShare it with instructors via Google Calendar settings.', ui.ButtonSet.OK);
 }
 
-// ── Sheet read/write helpers ──────────────────────────────────────────────────
+// ── Lessons Sheet ─────────────────────────────────────────────────────────────
 
-function buildEnrollmentHeaders() {
-  var h = ['enrollmentId','userId','courseId','studentName','phone','email',
-           'courseName','totalLessons','enrollmentStatus','instructorId','instructorName','instructorEmail'];
-  for (var i = 1; i <= MAX_LESSONS; i++) h.push('lesson'+i+'DateTime','lesson'+i+'Instructor','lesson'+i+'Status');
-  return h;
-}
-function buildEventHeaders() { return ['id','title','caption','flyerUrl','startAt','endAt','isActive']; }
-function buildCancellationHeaders() { return ['enrollmentId','lessonNumber','studentName','studentEmail','courseName','scheduledAt','cancelledAt','hoursNotice','isLate']; }
-function isDateTimeHeader(h) { return /^lesson\\d+DateTime$/.test(h) || ['startAt','endAt','scheduledAt','cancelledAt'].indexOf(h) !== -1; }
-
-function findHeaderRow(sheet, firstHeader) {
-  var maxScanRows = Math.min(sheet.getLastRow(), 10);
-  for (var r = 1; r <= maxScanRows; r++) {
-    if (String(sheet.getRange(r, 1).getValue() || '') === String(firstHeader)) return r;
+function _ensureLessonsSheet(ss) {
+  var sheet = ss.getSheetByName(LESSONS_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(LESSONS_SHEET);
+    _formatLessonsHeader(sheet);
   }
-  return 1;
+  return sheet;
 }
 
-function writeSheetRows(sheetName, headers, rows) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
-  var startRow = findHeaderRow(sheet, headers[0]);
-  var dateIdxs = []; headers.forEach(function(h,i) { if (isDateTimeHeader(h)) dateIdxs.push(i); });
-  var values = [headers];
-  rows.forEach(function(row) {
-    values.push(headers.map(function(h,i) {
-      var raw = row[h];
-      if (dateIdxs.indexOf(i) !== -1 && raw && typeof raw === 'string') { var d = new Date(raw); if (!isNaN(d.getTime())) return d; }
-      return normalizeCell(raw);
-    }));
-  });
+function _formatLessonsHeader(sheet) {
+  var headers = ['Enrollment ID', 'Student Name', 'Email', 'Course', 'Lesson #', 'Date', 'Time', 'Instructor', 'Status'];
+  sheet.getRange(1, 1, 1, LESSONS_COL_COUNT).setValues([headers])
+    .setBackground(C.navy).setFontColor(C.white).setFontWeight('bold');
 
-  var clearFromRow = startRow;
-  var clearRowCount = Math.max(sheet.getLastRow() - startRow + 1, values.length);
-  if (clearRowCount > 0) {
-    sheet.getRange(clearFromRow, 1, clearRowCount, headers.length).clearContent().clearFormat();
-  }
+  // Column widths
+  sheet.setColumnWidth(COL_ENROLLMENT_ID, 100);
+  sheet.setColumnWidth(COL_STUDENT_NAME,  160);
+  sheet.setColumnWidth(COL_EMAIL,         200);
+  sheet.setColumnWidth(COL_COURSE_NAME,   180);
+  sheet.setColumnWidth(COL_LESSON_NUM,    70);
+  sheet.setColumnWidth(COL_DATE,          110);
+  sheet.setColumnWidth(COL_TIME,          90);
+  sheet.setColumnWidth(COL_INSTRUCTOR,    150);
+  sheet.setColumnWidth(COL_STATUS,        90);
 
-  sheet.getRange(startRow, 1, values.length, headers.length).setValues(values);
-  if (values.length > 1) {
-    dateIdxs.forEach(function(idx) {
-      sheet.getRange(startRow + 1, idx + 1, values.length - 1, 1).setNumberFormat('dd/mm/yy h:mm am/pm');
+  sheet.setFrozenRows(1);
+  sheet.setFrozenColumns(5);
+}
+
+function _writeLessonsSheet(lessonRows, instructors) {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(LESSONS_SHEET) || ss.insertSheet(LESSONS_SHEET);
+  var tz    = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+
+  // Preserve existing instructor overrides keyed by enrollmentId+lessonNumber
+  var existingInstrs = {};
+  if (sheet.getLastRow() > 1) {
+    var existing = sheet.getRange(2, 1, sheet.getLastRow() - 1, LESSONS_COL_COUNT).getValues();
+    existing.forEach(function(r) {
+      var key = String(r[COL_ENROLLMENT_ID-1]) + '-' + String(r[COL_LESSON_NUM-1]);
+      if (r[COL_INSTRUCTOR-1]) existingInstrs[key] = r[COL_INSTRUCTOR-1];
     });
   }
-  sheet.getRange(startRow, 1, 1, headers.length).setFontWeight('bold').setBackground(C.navy).setFontColor(C.white);
 
-  var frozenRows = sheet.getFrozenRows();
-  if (frozenRows < startRow) sheet.setFrozenRows(startRow);
-  // Apply alternating row colors first (r=1 = first data row = sheet row 2)
-  for (var r = 1; r < values.length; r++) sheet.getRange(startRow + r,1,1,headers.length).setBackground(r%2===0 ? C.altRow : C.white);
-  // Apply instructor column highlight AFTER row colors so it isn't overwritten
-  ['instructorId','instructorName','instructorEmail'].forEach(function(col) {
-    var idx = headers.indexOf(col); if (idx >= 0 && values.length > 1) sheet.getRange(startRow + 1,idx+1,values.length-1,1).setBackground(C.instrBlue);
+  sheet.clearContents();
+  sheet.clearFormats();
+  _formatLessonsHeader(sheet);
+
+  if (lessonRows.length === 0) return;
+
+  var values = lessonRows.map(function(row) {
+    var key = String(row.enrollmentId) + '-' + String(row.lessonNumber);
+    var instructor = existingInstrs[key] || row.instructor || '';
+
+    // Split scheduledAt into date and time
+    var dateVal = '';
+    var timeVal = '';
+    if (row.scheduledAt) {
+      var dt = new Date(row.scheduledAt);
+      if (!isNaN(dt.getTime())) {
+        dateVal = dt; // will be formatted as date
+        // Format time as h:mmam/pm
+        var h = dt.getHours(), m = dt.getMinutes();
+        var ampm = h >= 12 ? 'pm' : 'am';
+        var h12  = h % 12 || 12;
+        timeVal  = h12 + ':' + (m < 10 ? '0' : '') + m + ampm;
+      }
+    }
+
+    return [
+      row.enrollmentId,
+      row.studentName || '',
+      row.email || '',
+      row.courseName || '',
+      row.lessonNumber,
+      dateVal,
+      timeVal,
+      instructor,
+      row.status || '',
+    ];
   });
-  // Note: autoResizeColumns omitted for MasterEnrollments — 111 columns would exceed Apps Script time limit
+
+  sheet.getRange(2, 1, values.length, LESSONS_COL_COUNT).setValues(values);
+
+  // Format date column
+  sheet.getRange(2, COL_DATE, values.length, 1).setNumberFormat('dd/mm/yyyy');
+
+  // Read-only columns: grey background (enrollmentId, studentName, email, course, lessonNum, status)
+  [COL_ENROLLMENT_ID, COL_STUDENT_NAME, COL_EMAIL, COL_COURSE_NAME, COL_LESSON_NUM, COL_STATUS].forEach(function(col) {
+    sheet.getRange(2, col, values.length, 1).setBackground(C.readonly);
+  });
+
+  // Editable columns: white background
+  [COL_DATE, COL_TIME, COL_INSTRUCTOR].forEach(function(col) {
+    sheet.getRange(2, col, values.length, 1).setBackground(C.inputBg);
+  });
+
+  // Alternating row shading on read-only cols
+  for (var r = 0; r < values.length; r++) {
+    var bg = r % 2 === 0 ? C.altRow : C.white;
+    [COL_ENROLLMENT_ID, COL_STUDENT_NAME, COL_EMAIL, COL_COURSE_NAME, COL_LESSON_NUM, COL_STATUS].forEach(function(col) {
+      sheet.getRange(r + 2, col).setBackground(r % 2 === 0 ? '#e8e8e8' : C.readonly);
+    });
+  }
+
+  // Time dropdown
+  var timeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(TIME_SLOTS, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, COL_TIME, values.length, 1).setDataValidation(timeRule);
+
+  // Instructor dropdown from unique instructors list
+  if (instructors.length) {
+    var instrRule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(instructors, true)
+      .setAllowInvalid(true) // allow typing a custom name
+      .build();
+    sheet.getRange(2, COL_INSTRUCTOR, values.length, 1).setDataValidation(instrRule);
+  }
 }
 
-function readSheetRows(sheetName, allowMissing) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) { if (allowMissing) return []; throw new Error('Sheet not found: ' + sheetName); }
-  var tz = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
-  var data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
-  // Skip instruction banner rows — find the real header row by looking for known column names
-  var headerRowIdx = 0;
-  var KNOWN_HEADERS = ['enrollmentId', 'id', 'title', 'startAt'];
-  for (var h = 0; h < Math.min(data.length, 6); h++) {
-    var firstCell = String(data[h][0] || '');
-    if (KNOWN_HEADERS.indexOf(firstCell) !== -1) { headerRowIdx = h; break; }
-  }
-  var headers = data[headerRowIdx].map(String), rows = [];
-  for (var i = headerRowIdx + 1; i < data.length; i++) {
-    var obj = {}, hasData = false;
-    for (var c = 0; c < headers.length; c++) {
-      var key = headers[c]; if (!key) continue;
-      var val = data[i][c];
-      if (val instanceof Date) val = Utilities.formatDate(val, tz, 'd/M/yyyy H:mm:ss');
-      if (val === '') val = null;
-      obj[key] = val;
-      if (val !== null && val !== undefined) hasData = true;
+function _readLessonsSheet() {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(LESSONS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var tz   = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, LESSONS_COL_COUNT).getValues();
+  var rows = [];
+
+  data.forEach(function(r) {
+    var enrollmentId = r[COL_ENROLLMENT_ID - 1];
+    var lessonNumber = r[COL_LESSON_NUM - 1];
+    if (!enrollmentId || !lessonNumber) return;
+
+    var dateVal = r[COL_DATE - 1];
+    var timeVal = String(r[COL_TIME - 1] || '').trim();
+    var scheduledAt = null;
+
+    if (dateVal) {
+      var d = (dateVal instanceof Date) ? dateVal : new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        // Parse time string e.g. "9:00am", "2:30pm"
+        var hour = 0, minute = 0;
+        if (timeVal) {
+          var tm = timeVal.match(/^(\\d{1,2}):(\\d{2})(am|pm)$/i);
+          if (tm) {
+            hour   = parseInt(tm[1], 10);
+            minute = parseInt(tm[2], 10);
+            if (tm[3].toLowerCase() === 'pm' && hour < 12) hour += 12;
+            if (tm[3].toLowerCase() === 'am' && hour === 12) hour = 0;
+          }
+        }
+        // Build datetime in Vietnam timezone (UTC+7) → convert to UTC
+        var dateStr = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+        var parts   = dateStr.split('-');
+        var year    = parseInt(parts[0], 10);
+        var month   = parseInt(parts[1], 10) - 1;
+        var day     = parseInt(parts[2], 10);
+        var utcMs   = Date.UTC(year, month, day, hour, minute, 0) - 7 * 60 * 60 * 1000;
+        scheduledAt = new Date(utcMs).toISOString();
+      }
     }
-    if (hasData) rows.push(obj);
-  }
+
+    rows.push({
+      enrollmentId: enrollmentId,
+      lessonNumber: lessonNumber,
+      scheduledAt:  scheduledAt,
+      instructor:   String(r[COL_INSTRUCTOR - 1] || ''),
+    });
+  });
+
   return rows;
 }
 
-function normalizeCell(v) {
-  if (v === null || v === undefined) return '';
-  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
-  if (v instanceof Date) return v.toISOString();
-  return v;
+function _extractInstructors(lessonRows) {
+  var seen = {}, list = [];
+  lessonRows.forEach(function(r) {
+    var n = String(r.instructor || '').trim();
+    if (n && !seen[n]) { seen[n] = true; list.push(n); }
+  });
+  return list.sort();
 }
+
+// ── Events Sheet ──────────────────────────────────────────────────────────────
+
+function _ensureEventsSheet(ss) {
+  var sheet = ss.getSheetByName(EVENTS_SHEET);
+  if (!sheet) sheet = ss.insertSheet(EVENTS_SHEET);
+  _formatEventsHeader(sheet);
+  return sheet;
+}
+
+function _formatEventsHeader(sheet) {
+  var headers = ['id','title','caption','flyerUrl','startAt','endAt','isActive'];
+  sheet.getRange(1, 1, 1, 7).setValues([headers])
+    .setBackground(C.navy).setFontColor(C.white).setFontWeight('bold');
+  sheet.setFrozenRows(1);
+}
+
+function _writeEventsSheet(events) {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(EVENTS_SHEET) || ss.insertSheet(EVENTS_SHEET);
+  sheet.clearContents();
+  _formatEventsHeader(sheet);
+  if (!events.length) return;
+
+  var headers = ['id','title','caption','flyerUrl','startAt','endAt','isActive'];
+  var dateIdxs = [4, 5]; // startAt, endAt (0-indexed)
+  var values = events.map(function(row) {
+    return headers.map(function(h, i) {
+      var v = row[h];
+      if (dateIdxs.indexOf(i) !== -1 && v && typeof v === 'string') {
+        var d = new Date(v); if (!isNaN(d.getTime())) return d;
+      }
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+      return v;
+    });
+  });
+
+  sheet.getRange(2, 1, values.length, 7).setValues(values);
+  sheet.getRange(2, 5, values.length, 1).setNumberFormat('dd/mm/yy h:mm am/pm');
+  sheet.getRange(2, 6, values.length, 1).setNumberFormat('dd/mm/yy h:mm am/pm');
+}
+
+function _readEventsSheet() {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(EVENTS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var tz      = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  var headers = ['id','title','caption','flyerUrl','startAt','endAt','isActive'];
+  var data    = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
+  var rows    = [];
+  data.forEach(function(r) {
+    if (!r[1]) return; // skip rows without title
+    var obj = {};
+    headers.forEach(function(h, i) {
+      var v = r[i];
+      if (v instanceof Date) v = Utilities.formatDate(v, tz, 'd/M/yyyy H:mm:ss');
+      if (v === '') v = null;
+      obj[h] = v;
+    });
+    rows.push(obj);
+  });
+  return rows;
+}
+
+// ── Cancellations Sheet ───────────────────────────────────────────────────────
+
+function _writeCancellationsSheet(cancellations) {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Cancellations') || ss.insertSheet('Cancellations');
+  var headers = ['enrollmentId','lessonNumber','studentName','studentEmail','courseName','scheduledAt','cancelledAt','hoursNotice','isLate'];
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setBackground(C.navy).setFontColor(C.white).setFontWeight('bold');
+  if (!cancellations.length) return;
+  var values = cancellations.map(function(row) {
+    return headers.map(function(h) {
+      var v = row[h];
+      if (v === null || v === undefined) return '';
+      return v;
+    });
+  });
+  sheet.getRange(2, 1, values.length, headers.length).setValues(values);
+  sheet.setFrozenRows(1);
+}
+
+// ── Calendar Sheet ────────────────────────────────────────────────────────────
+
+function _ensureCalendarSheet(ss) {
+  var sheet = ss.getSheetByName(CAL_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(CAL_SHEET);
+    _buildCalendarControls(sheet);
+    renderCalendar(sheet);
+  }
+  return sheet;
+}
+
+function _buildCalendarControls(sheet) {
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var now    = new Date();
+  sheet.getRange(1, 1).setValue('Month:').setFontWeight('bold');
+  var rule = SpreadsheetApp.newDataValidation().requireValueInList(MONTHS, true).build();
+  sheet.getRange('B1').setDataValidation(rule).setValue(MONTHS[now.getMonth()]).setFontWeight('bold');
+  sheet.getRange(1, 3).setValue('Year:').setFontWeight('bold');
+  sheet.getRange('D1').setValue(now.getFullYear()).setNumberFormat('0').setFontWeight('bold');
+  sheet.getRange(1, 5).setValue('Change B1 / D1 to switch month or year')
+    .setFontColor(C.hintText).setFontStyle('italic');
+  sheet.setFrozenRows(2);
+  for (var c = 1; c <= 7; c++) sheet.setColumnWidth(c, 155);
+}
+
+function renderCalendar(sheet) {
+  var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var monthVal = sheet.getRange('B1').getValue();
+  var yearVal  = sheet.getRange('D1').getValue();
+  var month    = MONTHS.indexOf(String(monthVal).trim()) + 1;
+  var year     = parseInt(yearVal, 10);
+  if (!month || !year || year < 2000 || year > 2100) return;
+
+  var lessonsByDay = {};
+  try {
+    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var lsheet = ss.getSheetByName(LESSONS_SHEET);
+    if (lsheet && lsheet.getLastRow() > 1) {
+      var data = lsheet.getRange(2, 1, lsheet.getLastRow() - 1, LESSONS_COL_COUNT).getValues();
+      data.forEach(function(r) {
+        if ((String(r[COL_STATUS-1]||'')).toLowerCase() === 'cancelled') return;
+        var dateVal = r[COL_DATE-1];
+        var timeVal = String(r[COL_TIME-1]||'');
+        if (!dateVal) return;
+        var d = dateVal instanceof Date ? dateVal : new Date(dateVal);
+        if (isNaN(d.getTime())) return;
+        if (d.getFullYear() !== year || d.getMonth() + 1 !== month) return;
+        var key = String(d.getDate());
+        if (!lessonsByDay[key]) lessonsByDay[key] = [];
+        lessonsByDay[key].push({
+          time:     timeVal || '',
+          student:  String(r[COL_STUDENT_NAME-1]||'?'),
+          course:   String(r[COL_COURSE_NAME-1]||''),
+          instructor: String(r[COL_INSTRUCTOR-1]||'')
+        });
+      });
+    }
+  } catch(e) { Logger.log('renderCalendar error: ' + e.message); }
+
+  var daysInMonth = new Date(year, month, 0).getDate();
+  var startDow    = new Date(year, month - 1, 1).getDay();
+  var weeks = [], week = [];
+  for (var p = 0; p < startDow; p++) week.push(0);
+  for (var d = 1; d <= daysInMonth; d++) {
+    week.push(d);
+    if (week.length === 7) { weeks.push(week); week = []; }
+  }
+  while (week.length && week.length < 7) week.push(0);
+  if (week.length) weeks.push(week);
+
+  var lastRow = Math.max(sheet.getLastRow(), 12);
+  if (lastRow >= 3) sheet.getRange(3, 1, lastRow - 2, 7).clearContent().clearFormat();
+
+  DAYS.forEach(function(name, col) {
+    sheet.getRange(2, col + 1).setValue(name)
+      .setBackground(C.navyMid).setFontColor(C.white).setFontWeight('bold')
+      .setHorizontalAlignment('center');
+  });
+
+  weeks.forEach(function(wk, wkIdx) {
+    var sheetRow = wkIdx + 3;
+    var maxL = 0;
+    wk.forEach(function(day) { if (day && lessonsByDay[String(day)]) maxL = Math.max(maxL, lessonsByDay[String(day)].length); });
+    sheet.setRowHeight(sheetRow, Math.max(72, 36 + maxL * 22));
+    wk.forEach(function(day, colIdx) {
+      var cell = sheet.getRange(sheetRow, colIdx + 1);
+      if (!day) { cell.setBackground('#f5f5f5'); return; }
+      var lessons = lessonsByDay[String(day)] || [];
+      var lines   = [String(day)];
+      lessons.forEach(function(l) {
+        lines.push((l.time ? l.time + '  ' : '') + l.student);
+        if (l.course) lines.push('  ' + l.course + (l.instructor ? ' - ' + l.instructor : ''));
+      });
+      cell.setValue(lines.join('\\n')).setWrap(true).setVerticalAlignment('top')
+        .setBackground(lessons.length ? C.calBlue : C.white)
+        .setBorder(true,true,true,true,false,false,'#cccccc',SpreadsheetApp.BorderStyle.SOLID);
+    });
+  });
+}
+
+// ── Audit Sheet ───────────────────────────────────────────────────────────────
+
+function _ensureAuditSheet(ss) {
+  var sheet = ss.getSheetByName(AUDIT_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(AUDIT_SHEET);
+    _buildAuditControls(sheet);
+    renderAudit(sheet);
+  }
+  return sheet;
+}
+
+function _buildAuditControls(sheet) {
+  var now  = new Date();
+  var from = new Date(now.getFullYear(), now.getMonth(), 1);
+  var to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  sheet.getRange(1, 1).setValue('From:').setFontWeight('bold');
+  sheet.getRange('B1').setValue(from).setNumberFormat('dd/mm/yyyy').setFontWeight('bold');
+  sheet.getRange(1, 3).setValue('To:').setFontWeight('bold');
+  sheet.getRange('D1').setValue(to).setNumberFormat('dd/mm/yyyy').setFontWeight('bold');
+  sheet.getRange(1, 5).setValue('Change B1 / D1 to switch date range')
+    .setFontColor(C.hintText).setFontStyle('italic');
+  sheet.setFrozenRows(2);
+}
+
+function renderAudit(sheet) {
+  var fromVal = sheet.getRange('B1').getValue();
+  var toVal   = sheet.getRange('D1').getValue();
+  if (!fromVal || !toVal) return;
+  var startDate = new Date(fromVal); startDate.setHours(0,0,0,0);
+  var endDate   = new Date(toVal);   endDate.setHours(23,59,59,999);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
+
+  var byInstructor = {};
+  try {
+    var ss     = SpreadsheetApp.getActiveSpreadsheet();
+    var lsheet = ss.getSheetByName(LESSONS_SHEET);
+    if (lsheet && lsheet.getLastRow() > 1) {
+      var data = lsheet.getRange(2, 1, lsheet.getLastRow() - 1, LESSONS_COL_COUNT).getValues();
+      data.forEach(function(r) {
+        if ((String(r[COL_STATUS-1]||'')).toLowerCase() === 'cancelled') return;
+        var dateVal = r[COL_DATE-1];
+        if (!dateVal) return;
+        var dt = dateVal instanceof Date ? dateVal : new Date(dateVal);
+        if (isNaN(dt.getTime()) || dt < startDate || dt > endDate) return;
+        var instr = (String(r[COL_INSTRUCTOR-1]||'') || 'Unassigned').trim();
+        if (!byInstructor[instr]) byInstructor[instr] = [];
+        byInstructor[instr].push({
+          student: String(r[COL_STUDENT_NAME-1]||''),
+          course:  String(r[COL_COURSE_NAME-1]||''),
+          num:     r[COL_LESSON_NUM-1],
+          date:    dt
+        });
+      });
+    }
+  } catch(e) { Logger.log('renderAudit error: ' + e.message); return; }
+
+  var lastRow = Math.max(sheet.getLastRow(), 10);
+  if (lastRow >= 3) sheet.getRange(3, 1, lastRow - 2, 5).clearContent().clearFormat();
+
+  var instructors = Object.keys(byInstructor).sort();
+  var total = instructors.reduce(function(s,n) { return s + byInstructor[n].length; }, 0);
+  var r = 3;
+
+  if (!instructors.length) {
+    sheet.getRange(r,1,1,5).merge().setValue('No lessons found for this date range.')
+      .setFontStyle('italic').setFontColor(C.hintText);
+    return;
+  }
+
+  sheet.getRange(r,1,1,3).setValues([['Instructor','Lessons','Period']])
+    .setBackground(C.navyMid).setFontColor(C.white).setFontWeight('bold');
+  r++;
+
+  var tz     = Session.getScriptTimeZone();
+  var period = Utilities.formatDate(startDate, tz, 'dd/MM/yyyy') + ' - ' + Utilities.formatDate(endDate, tz, 'dd/MM/yyyy');
+  instructors.forEach(function(name) {
+    sheet.getRange(r,1,1,3).setValues([[name, byInstructor[name].length, period]])
+      .setBackground(r%2===0 ? C.altRow : C.white);
+    r++;
+  });
+  sheet.getRange(r,1,1,2).setValues([['TOTAL', total]]).setFontWeight('bold'); r += 2;
+
+  sheet.getRange(r,1,1,5).setValues([['Instructor','Student','Course','Lesson #','Date & Time']])
+    .setBackground(C.navyMid).setFontColor(C.white).setFontWeight('bold');
+  r++;
+  instructors.forEach(function(name) {
+    var lessons = byInstructor[name].slice().sort(function(a,b) { return a.date - b.date; });
+    lessons.forEach(function(l) {
+      sheet.getRange(r,1,1,5).setValues([[name, l.student, l.course, 'Lesson ' + l.num, l.date]])
+        .setBackground(r%2===0 ? C.altRow : C.white);
+      sheet.getRange(r,5).setNumberFormat('dd/mm/yy h:mm am/pm');
+      r++;
+    });
+    sheet.getRange(r,1,1,2).setValues([['Subtotal: '+name, lessons.length]]).setFontWeight('bold');
+    r++;
+  });
+  sheet.autoResizeColumns(1, 5);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
 
 function parseSuperJSON(text) { var r = JSON.parse(text); return (r && r.json) ? r.json : r; }
 

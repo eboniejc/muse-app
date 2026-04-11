@@ -257,6 +257,100 @@ function buildFlattenedEnrollments(input: {
   });
 }
 
+function buildLessonRows(input: {
+  courses: any[];
+  courseEnrollments: any[];
+  lessonSchedules: any[];
+  users: any[];
+  userProfiles: any[];
+  lessonCancellations: any[];
+}): Record<string, unknown>[] {
+  const { courses, courseEnrollments, lessonSchedules, users, userProfiles, lessonCancellations } = input;
+
+  const cancelledSet = new Set<string>();
+  for (const row of lessonCancellations ?? []) {
+    const eid = readField<string | number>(row, "enrollmentId");
+    const ln = readField<string | number>(row, "lessonNumber");
+    if (eid && ln) cancelledSet.add(`${eid}-${ln}`);
+  }
+
+  const courseById = new Map(
+    (courses ?? []).map((row: any) => [String(readField(row, "id")), row])
+  );
+  const userById = new Map(
+    (users ?? []).map((row: any) => [String(readField(row, "id")), row])
+  );
+  const profileByUserId = new Map(
+    (userProfiles ?? []).map((row: any) => [
+      String(readField(row, "userId", "user_id")),
+      row,
+    ])
+  );
+
+  const scheduleByEnrollmentLesson = new Map<string, any>();
+  for (const row of lessonSchedules ?? []) {
+    const enrollmentId = readField<string | number>(row, "enrollmentId", "enrollment_id");
+    const lessonNumber = Number(readField(row, "lessonNumber", "lesson_number") ?? 0);
+    if (!enrollmentId || !lessonNumber) continue;
+    scheduleByEnrollmentLesson.set(`${enrollmentId}-${lessonNumber}`, row);
+  }
+
+  const nowMs = Date.now();
+  const oneHourMs = 60 * 60 * 1000;
+  const rows: Record<string, unknown>[] = [];
+
+  const sortedEnrollments = [...(courseEnrollments ?? [])].sort(
+    (a, b) => Number(readField(a, "id")) - Number(readField(b, "id"))
+  );
+
+  for (const enrollment of sortedEnrollments) {
+    const enrollmentId = readField<string | number>(enrollment, "id");
+    const userId = readField<string | number>(enrollment, "userId", "user_id");
+    const courseId = readField<string | number>(enrollment, "courseId", "course_id");
+    const course = courseById.get(String(courseId));
+    const user = userById.get(String(userId));
+    const profile = profileByUserId.get(String(userId));
+    const instructorId = readField<string | number>(course ?? {}, "instructorId", "instructor_id");
+    const instructor = instructorId ? userById.get(String(instructorId)) : null;
+
+    const studentName =
+      readField(profile ?? {}, "fullName", "full_name") ??
+      readField(user ?? {}, "displayName", "displayname") ??
+      readField(user ?? {}, "email") ?? "";
+    const email = readField(user ?? {}, "email") ?? "";
+    const courseName = readField(course ?? {}, "name") ?? "";
+    const totalLessons = Number(readField(course ?? {}, "totalLessons", "total_lessons") ?? 0);
+    const instructorName = readField(instructor ?? {}, "displayName", "displayname") ?? "";
+
+    for (let i = 1; i <= totalLessons; i++) {
+      const schedule = scheduleByEnrollmentLesson.get(`${enrollmentId}-${i}`);
+      const scheduledAt = readField<string | null>(schedule ?? {}, "scheduledAt", "scheduled_at") ?? null;
+      const scheduledMs = scheduledAt ? new Date(scheduledAt).getTime() : NaN;
+      const isCancelled = cancelledSet.has(`${enrollmentId}-${i}`);
+
+      let status = "";
+      if (isCancelled) {
+        status = "cancelled";
+      } else if (Number.isFinite(scheduledMs) && scheduledMs + oneHourMs <= nowMs) {
+        status = "completed";
+      }
+
+      rows.push({
+        enrollmentId,
+        studentName,
+        email,
+        courseName,
+        lessonNumber: i,
+        scheduledAt: scheduledAt ?? null,
+        instructor: instructorName,
+        status,
+      });
+    }
+  }
+
+  return rows;
+}
+
 export async function handle(request: Request) {
   try {
     const validation = validateSheetsApiKey(request);
@@ -430,6 +524,14 @@ export async function handle(request: Request) {
       users,
       userProfiles,
       flattenedEnrollments,
+      lessonRows: buildLessonRows({
+        courses,
+        courseEnrollments,
+        lessonSchedules,
+        users,
+        userProfiles,
+        lessonCancellations,
+      }),
       lessonCancellations: (lessonCancellations ?? []).sort(
         (a: any, b: any) => new Date(b.cancelledAt ?? 0).getTime() - new Date(a.cancelledAt ?? 0).getTime()
       ),

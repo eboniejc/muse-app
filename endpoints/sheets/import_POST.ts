@@ -298,6 +298,8 @@ export async function handle(request: Request) {
 
     if (table === "flattenedEnrollments") {
       processedCount = await handleFlattenedEnrollmentsImport(rows);
+    } else if (table === "lessonRows") {
+      processedCount = await handleLessonRowsImport(rows);
     } else if (table === "lessonSchedules") {
       processedCount = await handleLessonSchedulesImport(rows);
     } else if (table === "events") {
@@ -464,6 +466,31 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
   const deleteCount = await handleLessonSchedulesDelete(lessonsToDelete);
   const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
   return processedEnrollments + scheduleCount + deleteCount;
+}
+
+// Handles the new row-per-lesson sheet format.
+// Each row has: enrollmentId, lessonNumber, scheduledAt (ISO string or null).
+// Non-null scheduledAt → upsert. Null scheduledAt → delete.
+async function handleLessonRowsImport(rows: any[]) {
+  const scheduleRows: Array<Record<string, any>> = [];
+  const deleteRows: Array<{ enrollmentId: string | number; lessonNumber: number }> = [];
+
+  for (const raw of rows as Array<Record<string, any>>) {
+    const enrollmentId = raw.enrollmentId ?? null;
+    const lessonNumber = Number(raw.lessonNumber ?? 0);
+    if (!enrollmentId || !lessonNumber) continue;
+
+    const scheduledAt = raw.scheduledAt ?? null;
+    if (scheduledAt) {
+      scheduleRows.push({ enrollmentId, lessonNumber, scheduledAt });
+    } else {
+      deleteRows.push({ enrollmentId, lessonNumber });
+    }
+  }
+
+  const deleteCount = await handleLessonSchedulesDelete(deleteRows);
+  const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
+  return scheduleCount + deleteCount;
 }
 
 async function handleLessonSchedulesDelete(
