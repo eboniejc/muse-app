@@ -1,4 +1,5 @@
 import { db } from "../../../helpers/db";
+import { supabaseAdmin } from "../../../helpers/supabaseServer";
 import { getServerUserSession } from "../../../helpers/getServerUserSession";
 import { schema, OutputType } from "./schedule_POST.schema";
 import {
@@ -21,13 +22,26 @@ export async function handle(request: Request) {
     const json = superjson.parse(await request.text());
     const input = schema.parse(json);
 
-    // Fetch enrollment to get the student's userId and course name
-    const enrollment = await db
-      .selectFrom("courseEnrollments")
-      .innerJoin("courses", "courseEnrollments.courseId", "courses.id")
-      .select(["courseEnrollments.userId", "courses.name as courseName"])
-      .where("courseEnrollments.id", "=", input.enrollmentId)
-      .executeTakeFirst();
+    // Fetch enrollment to get the student's userId and course name via Supabase
+    // (avoids Kysely CamelCase→snake_case mismatch for "courseEnrollments" table)
+    const { data: enrollmentData } = await supabaseAdmin
+      .from("courseEnrollments")
+      .select("userId,courseId")
+      .eq("id", input.enrollmentId as any)
+      .maybeSingle();
+
+    let enrollment: { userId: number; courseName: string } | null = null;
+    if (enrollmentData) {
+      const { data: courseData } = await supabaseAdmin
+        .from("courses")
+        .select("name")
+        .eq("id", (enrollmentData as any).courseId)
+        .maybeSingle();
+      enrollment = {
+        userId: (enrollmentData as any).userId,
+        courseName: (courseData as any)?.name ?? "Course",
+      };
+    }
 
     if (!enrollment) {
       return new Response(
@@ -37,12 +51,19 @@ export async function handle(request: Request) {
     }
 
     // Check for an existing schedule to cancel old notifications
-    const existing = await db
-      .selectFrom("lessonSchedules")
-      .select(["id", "notification1hId", "notification24hId"])
-      .where("enrollmentId", "=", input.enrollmentId)
-      .where("lessonNumber", "=", input.lessonNumber)
-      .executeTakeFirst();
+    // Use Supabase to avoid Kysely camelCase→snake_case mismatch for "lessonSchedules"
+    const { data: existingData } = await supabaseAdmin
+      .from("lessonSchedules")
+      .select("id,notification1hId,notification24hId")
+      .eq("enrollmentId", input.enrollmentId as any)
+      .eq("lessonNumber", input.lessonNumber as any)
+      .maybeSingle();
+
+    const existing = existingData as {
+      id: number;
+      notification1hId: string | null;
+      notification24hId: string | null;
+    } | null;
 
     if (existing) {
       if (existing.notification24hId) {
@@ -97,33 +118,34 @@ export async function handle(request: Request) {
       });
     }
 
-    // Upsert the lesson schedule row
+    // Upsert the lesson schedule row via Supabase
     let scheduleId: number;
     if (existing) {
-      await db
-        .updateTable("lessonSchedules")
-        .set({
-          scheduledAt,
+      const { error: updateErr } = await supabaseAdmin
+        .from("lessonSchedules")
+        .update({
+          scheduledAt: scheduledAt.toISOString(),
           notification24hId,
           notification1hId,
-          updatedAt: new Date(),
+          updatedAt: new Date().toISOString(),
         })
-        .where("id", "=", existing.id)
-        .execute();
+        .eq("id", existing.id as any);
+      if (updateErr) throw updateErr;
       scheduleId = existing.id;
     } else {
-      const inserted = await db
-        .insertInto("lessonSchedules")
-        .values({
+      const { data: inserted, error: insertErr } = await supabaseAdmin
+        .from("lessonSchedules")
+        .insert({
           enrollmentId: input.enrollmentId,
           lessonNumber: input.lessonNumber,
-          scheduledAt,
+          scheduledAt: scheduledAt.toISOString(),
           notification24hId,
           notification1hId,
         })
-        .returning("id")
-        .executeTakeFirstOrThrow();
-      scheduleId = inserted.id;
+        .select("id")
+        .single();
+      if (insertErr) throw insertErr;
+      scheduleId = (inserted as any).id;
     }
 
     return new Response(

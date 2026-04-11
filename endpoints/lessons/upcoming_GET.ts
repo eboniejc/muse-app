@@ -1,3 +1,4 @@
+import { db } from "../../helpers/db";
 import { getServerUserSession } from "../../helpers/getServerUserSession";
 import { NotAuthenticatedError } from "../../helpers/getSetServerSession";
 import { supabaseAdmin } from "../../helpers/supabaseServer";
@@ -10,6 +11,7 @@ function isSchemaError(error: any): boolean {
     error?.code === "PGRST205" ||
     error?.code === "PGRST204" ||
     error?.code === "42P01" ||
+    error?.code === "42703" ||
     message.includes("schema cache") ||
     message.includes("does not exist")
   );
@@ -24,97 +26,88 @@ export async function handle(request: Request) {
     todayStart.setUTCHours(0, 0, 0, 0);
     const fromIso = todayStart.toISOString();
 
-    let enrollments: any[] = [];
+    // Step 1: Get the student's enrollments via Kysely (CamelCasePlugin handles
+    // camelCase→snake_case translation automatically), falling back to Supabase REST.
+    let enrollmentRows: { id: number; courseId: number; status: string }[] = [];
 
-    // 1. Try camelCase columns
-    const { data: ceData, error: ceErr } = await supabaseAdmin
-      .from("courseEnrollments")
-      .select("id,courseId,status,userId")
-      .eq("userId", user.id as any)
-      .in("status", ["active", "completed"]);
-
-    if (!ceErr && ceData && ceData.length > 0) {
-      enrollments = ceData;
-    } else {
-      // 2. Same table, snake_case columns (most common Supabase default)
-      const { data: snakeData, error: snakeErr } = await supabaseAdmin
+    try {
+      const rows = await db
+        .selectFrom("courseEnrollments")
+        .select(["courseEnrollments.id", "courseEnrollments.courseId", "courseEnrollments.status"])
+        .where("courseEnrollments.userId", "=", user.id as any)
+        .where("courseEnrollments.status", "in", ["active", "completed"])
+        .execute();
+      enrollmentRows = rows as any;
+    } catch (kyselyErr) {
+      if (!isSchemaError(kyselyErr)) throw kyselyErr;
+      // Kysely failed — try Supabase REST with camelCase table name
+      const { data: ceData, error: ceErr } = await supabaseAdmin
         .from("courseEnrollments")
-        .select("id,course_id,status,user_id")
-        .eq("user_id", user.id as any)
+        .select("id,courseId,status")
+        .eq("userId", user.id as any)
         .in("status", ["active", "completed"]);
 
-      if (!snakeErr && snakeData && snakeData.length > 0) {
-        enrollments = snakeData.map((e: any) => ({
+      if (!ceErr && ceData && ceData.length > 0) {
+        enrollmentRows = ceData.map((e: any) => ({
           id: e.id,
-          courseId: e.course_id ?? e.courseId,
+          courseId: e.courseId ?? e.course_id,
           status: e.status,
-          userId: e.user_id ?? e.userId,
         }));
-      } else if (snakeErr && !isSchemaError(snakeErr)) {
-        throw snakeErr;
-      } else if (ceErr && !isSchemaError(ceErr)) {
-        throw ceErr;
+      } else {
+        // Try snake_case fallback
+        const { data: snakeData } = await supabaseAdmin
+          .from("course_enrollments")
+          .select("id,course_id,status")
+          .eq("user_id", user.id as any)
+          .in("status", ["active", "completed"]);
+        if (snakeData && snakeData.length > 0) {
+          enrollmentRows = snakeData.map((e: any) => ({
+            id: e.id,
+            courseId: e.course_id,
+            status: e.status,
+          }));
+        }
       }
     }
 
-    const enrollmentRows = enrollments ?? [];
     if (enrollmentRows.length === 0) {
       return new Response(
         superjson.stringify({ lessons: [] } satisfies OutputType)
       );
     }
 
-    const enrollmentIds = enrollmentRows.map((e: any) => e.id);
-    const enrollmentMap = new Map(
-      enrollmentRows.map((e: any) => [String(e.id), e])
-    );
+    const enrollmentIds = enrollmentRows.map((e) => e.id);
+    const enrollmentMap = new Map(enrollmentRows.map((e) => [e.id, e]));
 
-    let schedules: any[] = [];
-
-    // Try camelCase column names first (matches the import write path)
-    const { data: schedData, error: schedErr } = await supabaseAdmin
+    // Step 2: Fetch upcoming lesson schedules via Supabase (avoids Kysely
+    // CamelCase translation issue where lessonSchedules → lesson_schedules).
+    const { data: rawSchedules, error: schedErr } = await supabaseAdmin
       .from("lessonSchedules")
       .select("id,enrollmentId,lessonNumber,scheduledAt")
-      .in("enrollmentId", enrollmentIds)
+      .in("enrollmentId", enrollmentIds as any[])
       .gte("scheduledAt", fromIso)
       .order("scheduledAt", { ascending: true });
 
-    if (!schedErr && schedData && schedData.length > 0) {
-      schedules = schedData;
-    } else {
-      // Fallback: try snake_case column names
-      const { data: snakeData, error: snakeErr } = await supabaseAdmin
-        .from("lessonSchedules")
-        .select("id,enrollment_id,lesson_number,scheduled_at")
-        .in("enrollment_id", enrollmentIds)
-        .gte("scheduled_at", fromIso)
-        .order("scheduled_at", { ascending: true });
+    if (schedErr && !isSchemaError(schedErr)) throw schedErr;
 
-      if (!snakeErr && snakeData && snakeData.length > 0) {
-        schedules = snakeData.map((s: any) => ({
-          id: s.id,
-          enrollmentId: s.enrollment_id,
-          lessonNumber: s.lesson_number,
-          scheduledAt: s.scheduled_at,
-        }));
-      } else if (snakeErr && !isSchemaError(snakeErr)) {
-        throw snakeErr;
-      } else if (schedErr && !isSchemaError(schedErr)) {
-        throw schedErr;
-      }
-    }
+    const scheduleRows = (rawSchedules ?? []).map((s: any) => ({
+      id: s.id,
+      enrollmentId: s.enrollmentId ?? s.enrollment_id,
+      lessonNumber: s.lessonNumber ?? s.lesson_number,
+      scheduledAt: s.scheduledAt ?? s.scheduled_at,
+    }));
 
-    const scheduleRows = schedules ?? [];
     if (scheduleRows.length === 0) {
       return new Response(
         superjson.stringify({ lessons: [] } satisfies OutputType)
       );
     }
 
+    // Step 3: Fetch course names
     const courseIds = Array.from(
       new Set(
         scheduleRows
-          .map((s: any) => enrollmentMap.get(String(s.enrollmentId))?.courseId)
+          .map((s) => enrollmentMap.get(s.enrollmentId)?.courseId)
           .filter(Boolean)
       )
     );
@@ -130,8 +123,8 @@ export async function handle(request: Request) {
     }
     const courseMap = new Map(courses.map((c: any) => [String(c.id), c.name]));
 
-    const lessons = scheduleRows.map((s: any) => {
-      const enrollment = enrollmentMap.get(String(s.enrollmentId));
+    const lessons = scheduleRows.map((s) => {
+      const enrollment = enrollmentMap.get(s.enrollmentId);
       const courseId = enrollment?.courseId ?? null;
       return {
         id: s.id,
@@ -159,4 +152,3 @@ export async function handle(request: Request) {
     );
   }
 }
-
