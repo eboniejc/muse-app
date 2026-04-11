@@ -1,4 +1,3 @@
-import { db } from "../../helpers/db";
 import { getServerUserSession } from "../../helpers/getServerUserSession";
 import { NotAuthenticatedError } from "../../helpers/getSetServerSession";
 import { supabaseAdmin } from "../../helpers/supabaseServer";
@@ -11,7 +10,6 @@ function isSchemaError(error: any): boolean {
     error?.code === "PGRST205" ||
     error?.code === "PGRST204" ||
     error?.code === "42P01" ||
-    error?.code === "42703" ||
     message.includes("schema cache") ||
     message.includes("does not exist")
   );
@@ -20,55 +18,48 @@ function isSchemaError(error: any): boolean {
 export async function handle(request: Request) {
   try {
     const { user } = await getServerUserSession(request);
-    // Show lessons from start of today (not just strict future) so lessons
-    // scheduled earlier today still appear in the student's view.
-    const todayStart = new Date();
-    todayStart.setUTCHours(0, 0, 0, 0);
-    const fromIso = todayStart.toISOString();
+    const nowIso = new Date().toISOString();
 
-    // Step 1: Get the student's enrollments via Kysely (CamelCasePlugin handles
-    // camelCase→snake_case translation automatically), falling back to Supabase REST.
-    let enrollmentRows: { id: number; courseId: number; status: string }[] = [];
+    // ── DIAGNOSTIC — remove once lessons are confirmed working ──────────
+    console.log("[upcoming_GET] user.id =", user.id, "type =", typeof user.id);
+    // ────────────────────────────────────────────────────────────────────
 
-    try {
-      const rows = await db
-        .selectFrom("courseEnrollments")
-        .select(["courseEnrollments.id", "courseEnrollments.courseId", "courseEnrollments.status"])
-        .where("courseEnrollments.userId", "=", user.id as any)
-        .where("courseEnrollments.status", "in", ["active", "completed"])
-        .execute();
-      enrollmentRows = rows as any;
-    } catch (kyselyErr) {
-      if (!isSchemaError(kyselyErr)) throw kyselyErr;
-      // Kysely failed — try Supabase REST with camelCase table name
-      const { data: ceData, error: ceErr } = await supabaseAdmin
-        .from("courseEnrollments")
-        .select("id,courseId,status")
-        .eq("userId", user.id as any)
+    const ceResult = await supabaseAdmin
+      .from("courseEnrollments")
+      .select("id,courseId,status,userId")
+      .eq("userId", user.id as any)
+      .in("status", ["active", "completed"]);
+    let enrollments: any[] = ceResult.data ?? [];
+    const enrollmentErr = ceResult.error;
+
+    // ── DIAGNOSTIC ───────────────────────────────────────────────────────
+    console.log("[upcoming_GET] enrollment query result:", { count: enrollments.length, enrollmentErr });
+    // ────────────────────────────────────────────────────────────────────
+
+    if (enrollmentErr || enrollments.length === 0) {
+      const snake = await supabaseAdmin
+        .from("course_enrollments")
+        .select("id,course_id,status,user_id")
+        .eq("user_id", user.id as any)
         .in("status", ["active", "completed"]);
-
-      if (!ceErr && ceData && ceData.length > 0) {
-        enrollmentRows = ceData.map((e: any) => ({
+      if (snake.error && !isSchemaError(snake.error)) throw snake.error;
+      if (!snake.error && snake.data && snake.data.length > 0) {
+        enrollments = snake.data.map((e: any) => ({
           id: e.id,
-          courseId: e.courseId ?? e.course_id,
+          courseId: e.course_id,
           status: e.status,
+          userId: e.user_id,
         }));
-      } else {
-        // Try snake_case fallback
-        const { data: snakeData } = await supabaseAdmin
-          .from("course_enrollments")
-          .select("id,course_id,status")
-          .eq("user_id", user.id as any)
-          .in("status", ["active", "completed"]);
-        if (snakeData && snakeData.length > 0) {
-          enrollmentRows = snakeData.map((e: any) => ({
-            id: e.id,
-            courseId: e.course_id,
-            status: e.status,
-          }));
-        }
+      } else if (enrollmentErr && !isSchemaError(enrollmentErr)) {
+        throw enrollmentErr;
       }
     }
+
+    const enrollmentRows = enrollments ?? [];
+
+    // ── DIAGNOSTIC ───────────────────────────────────────────────────────
+    console.log("[upcoming_GET] final enrollmentRows:", enrollmentRows);
+    // ────────────────────────────────────────────────────────────────────
 
     if (enrollmentRows.length === 0) {
       return new Response(
@@ -76,38 +67,55 @@ export async function handle(request: Request) {
       );
     }
 
-    const enrollmentIds = enrollmentRows.map((e) => e.id);
-    const enrollmentMap = new Map(enrollmentRows.map((e) => [e.id, e]));
+    const enrollmentIds = enrollmentRows.map((e: any) => e.id);
+    const enrollmentMap = new Map(
+      enrollmentRows.map((e: any) => [String(e.id), e])
+    );
 
-    // Step 2: Fetch upcoming lesson schedules via Supabase (avoids Kysely
-    // CamelCase translation issue where lessonSchedules → lesson_schedules).
-    const { data: rawSchedules, error: schedErr } = await supabaseAdmin
+    const schedResult = await supabaseAdmin
       .from("lessonSchedules")
       .select("id,enrollmentId,lessonNumber,scheduledAt")
-      .in("enrollmentId", enrollmentIds as any[])
-      .gte("scheduledAt", fromIso)
+      .in("enrollmentId", enrollmentIds)
+      .gte("scheduledAt", nowIso)
       .order("scheduledAt", { ascending: true });
+    let schedules: any[] = schedResult.data ?? [];
+    const scheduleErr = schedResult.error;
 
-    if (schedErr && !isSchemaError(schedErr)) throw schedErr;
+    // ── DIAGNOSTIC ───────────────────────────────────────────────────────
+    console.log("[upcoming_GET] schedule query result:", { count: schedules.length, scheduleErr, enrollmentIds });
+    // ────────────────────────────────────────────────────────────────────
 
-    const scheduleRows = (rawSchedules ?? []).map((s: any) => ({
-      id: s.id,
-      enrollmentId: s.enrollmentId ?? s.enrollment_id,
-      lessonNumber: s.lessonNumber ?? s.lesson_number,
-      scheduledAt: s.scheduledAt ?? s.scheduled_at,
-    }));
+    if (scheduleErr || schedules.length === 0) {
+      const snake = await supabaseAdmin
+        .from("lesson_schedules")
+        .select("id,enrollment_id,lesson_number,scheduled_at")
+        .in("enrollment_id", enrollmentIds)
+        .gte("scheduled_at", nowIso)
+        .order("scheduled_at", { ascending: true });
+      if (snake.error && !isSchemaError(snake.error)) throw snake.error;
+      if (!snake.error && snake.data) {
+        schedules = snake.data.map((s: any) => ({
+          id: s.id,
+          enrollmentId: s.enrollment_id,
+          lessonNumber: s.lesson_number,
+          scheduledAt: s.scheduled_at,
+        }));
+      } else if (scheduleErr && !isSchemaError(scheduleErr)) {
+        throw scheduleErr;
+      }
+    }
 
+    const scheduleRows = schedules ?? [];
     if (scheduleRows.length === 0) {
       return new Response(
         superjson.stringify({ lessons: [] } satisfies OutputType)
       );
     }
 
-    // Step 3: Fetch course names
     const courseIds = Array.from(
       new Set(
         scheduleRows
-          .map((s) => enrollmentMap.get(s.enrollmentId)?.courseId)
+          .map((s: any) => enrollmentMap.get(String(s.enrollmentId))?.courseId)
           .filter(Boolean)
       )
     );
@@ -123,8 +131,8 @@ export async function handle(request: Request) {
     }
     const courseMap = new Map(courses.map((c: any) => [String(c.id), c.name]));
 
-    const lessons = scheduleRows.map((s) => {
-      const enrollment = enrollmentMap.get(s.enrollmentId);
+    const lessons = scheduleRows.map((s: any) => {
+      const enrollment = enrollmentMap.get(String(s.enrollmentId));
       const courseId = enrollment?.courseId ?? null;
       return {
         id: s.id,
