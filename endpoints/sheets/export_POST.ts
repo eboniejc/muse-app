@@ -22,8 +22,9 @@ async function safeSelectAll(table: string) {
 }
 
 async function safeSelectCourseEnrollments() {
-  const rows = await safeSelectAll("courseEnrollments");
-  if (rows.length > 0) return rows;
+  // Always use Supabase directly — Kysely's CamelCasePlugin translates
+  // "courseEnrollments" → "course_enrollments" (a different table), which
+  // returns the wrong enrollment IDs and breaks lessonSchedules FK inserts.
   const { data, error } = await supabaseAdmin
     .from("courseEnrollments")
     .select("*");
@@ -460,7 +461,7 @@ export async function handle(request: Request) {
             "courseId",
             "course_id"
           );
-          const totalLessons = courseMap.get(String(courseId)) ?? 0;
+          const totalLessons = Number(courseMap.get(String(courseId)) ?? 0);
           for (let lessonNumber = 1; lessonNumber <= totalLessons; lessonNumber++) {
             const key = `${enrollmentId}-${lessonNumber}`;
             if (existingKeySet.has(key)) continue;
