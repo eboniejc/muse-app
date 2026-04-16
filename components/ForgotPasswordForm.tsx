@@ -8,7 +8,8 @@ import styles from "./ForgotPasswordForm.module.css";
 export const ForgotPasswordForm: React.FC = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [resetUrl, setResetUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,12 +20,17 @@ export const ForgotPasswordForm: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await fetch("/_api/auth/forgot_password", {
+      const res = await fetch("/_api/auth/forgot_password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim() }),
       });
-      setSubmitted(true);
+      const data = await res.json();
+      if (data.resetUrl) {
+        setResetUrl(data.resetUrl);
+      } else {
+        setError("No account found with that email address.");
+      }
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -32,17 +38,31 @@ export const ForgotPasswordForm: React.FC = () => {
     }
   };
 
-  if (submitted) {
+  const handleCopy = () => {
+    if (!resetUrl) return;
+    navigator.clipboard.writeText(resetUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  if (resetUrl) {
     return (
       <div className={styles.success}>
         <div className={styles.successIcon}>✓</div>
-        <h2 className={styles.successTitle}>Check your email</h2>
+        <h2 className={styles.successTitle}>Reset link ready</h2>
         <p className={styles.successText}>
-          If an account exists for <strong>{email}</strong>, we've sent a password reset link. Check your inbox (and spam folder).
+          Copy this link and send it to the student via WhatsApp or Zalo. It expires in <strong>1 hour</strong>.
         </p>
         <p className={styles.successTextVi}>
-          Nếu tài khoản tồn tại với email <strong>{email}</strong>, chúng tôi đã gửi liên kết đặt lại mật khẩu. Kiểm tra hộp thư đến (và thư rác) của bạn.
+          Sao chép liên kết này và gửi cho học viên qua WhatsApp hoặc Zalo. Liên kết hết hạn sau <strong>1 giờ</strong>.
         </p>
+        <div className={styles.linkBox}>
+          <span className={styles.linkText}>{resetUrl}</span>
+        </div>
+        <button onClick={handleCopy} className={styles.copyButton}>
+          {copied ? "Copied!" : "Copy link"}
+        </button>
         <Link to="/login" className={styles.backLink}>← Back to login</Link>
       </div>
     );
