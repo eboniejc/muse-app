@@ -1,4 +1,3 @@
-import { db } from "../../../helpers/db";
 import { getServerUserSession } from "../../../helpers/getServerUserSession";
 import { schema, OutputType } from "./list_GET.schema";
 import superjson from "superjson";
@@ -11,59 +10,60 @@ export async function handle(request: Request) {
 
     const url = new URL(request.url);
     const searchParams = Object.fromEntries(url.searchParams.entries());
-    
-    // Validate inputs via schema, although GET query params need manual parsing usually, 
-    // but here we can just cast or parse a constructed object.
+
     const queryInput = schema.parse({
         courseId: searchParams.courseId ? Number(searchParams.courseId) : undefined,
         status: searchParams.status || undefined
     });
 
-    let query = db
-      .selectFrom("courseEnrollments")
-      .innerJoin("courses", "courseEnrollments.courseId", "courses.id")
-      .innerJoin("users", "courseEnrollments.userId", "users.id")
-      .select([
-        "courseEnrollments.id",
-        "courseEnrollments.courseId",
-        "courseEnrollments.userId",
-        "courseEnrollments.status",
-        "courseEnrollments.enrolledAt",
-        "courseEnrollments.completedAt",
-        "courseEnrollments.progressPercentage",
-        "courses.name as courseName",
-        "courses.totalLessons",
-        "courses.skillLevel",
-        "users.displayName as studentName",
-        "users.email as studentEmail",
-      ])
-      .orderBy("courseEnrollments.enrolledAt", "desc");
+    // Use Supabase directly — Kysely's CamelCasePlugin translates
+    // "courseEnrollments" → "course_enrollments" (a different table).
+    let ceQuery = supabaseAdmin
+      .from("courseEnrollments")
+      .select("id, courseId, userId, status, enrolledAt, completedAt, progressPercentage")
+      .order("enrolledAt", { ascending: false });
 
     if (queryInput.courseId) {
-      query = query.where("courseEnrollments.courseId", "=", queryInput.courseId);
+      ceQuery = ceQuery.eq("courseId", queryInput.courseId as any);
     }
-
     if (queryInput.status) {
-      // @ts-expect-error - status string literal mismatch is fine here as it's validated by logic elsewhere or loose string
-      query = query.where("courseEnrollments.status", "=", queryInput.status);
+      ceQuery = ceQuery.eq("status", queryInput.status as any);
     }
 
-    const enrollments = await query.execute();
+    const { data: ceRows, error: ceErr } = await ceQuery;
+    if (ceErr) throw ceErr;
+    const enrollmentRows = ceRows ?? [];
 
-    if (enrollments.length === 0) {
+    if (enrollmentRows.length === 0) {
       return new Response(
         superjson.stringify({ enrollments: [] } satisfies OutputType)
       );
     }
 
-    const enrollmentIds = enrollments.map((e) => e.id);
+    // Fetch courses and users in parallel
+    const courseIds = [...new Set(enrollmentRows.map((e: any) => e.courseId))];
+    const userIds = [...new Set(enrollmentRows.map((e: any) => e.userId))];
 
-    // Fetch lesson completions for these enrollments
-    const allCompletions = await db
-      .selectFrom("lessonCompletions")
-      .select(["enrollmentId", "lessonNumber", "completedAt"])
-      .where("enrollmentId", "in", enrollmentIds)
-      .execute();
+    const [{ data: coursesData }, { data: usersData }] = await Promise.all([
+      supabaseAdmin.from("courses").select("id, name, totalLessons, skillLevel").in("id", courseIds as any[]),
+      supabaseAdmin.from("users").select("id, displayName, email").in("id", userIds as any[]),
+    ]);
+
+    const courseMap = new Map((coursesData ?? []).map((c: any) => [c.id, c]));
+    const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u]));
+
+    const enrollmentIds = enrollmentRows.map((e: any) => e.id);
+
+    // Fetch lesson completions via Supabase
+    const { data: completionsData } = await supabaseAdmin
+      .from("lessoncompletions")
+      .select("enrollmentId, lessonNumber, completedAt")
+      .in("enrollmentId", enrollmentIds as any[]);
+    const allCompletions = (completionsData ?? []).map((c: any) => ({
+      enrollmentId: c.enrollmentId ?? c.enrollment_id,
+      lessonNumber: c.lessonNumber ?? c.lesson_number,
+      completedAt: c.completedAt ?? c.completed_at,
+    }));
 
     // Fetch lesson schedules via Supabase (same path as the sheet import writer)
     // to avoid ORM camelCase→snake_case table name mismatch with lessonSchedules.
@@ -78,7 +78,9 @@ export async function handle(request: Request) {
     }));
 
     // Map completions and schedules to enrollments
-    const enrollmentsWithDetails = enrollments.map((enrollment) => {
+    const enrollmentsWithDetails = enrollmentRows.map((enrollment: any) => {
+      const course = courseMap.get(enrollment.courseId);
+      const user = userMap.get(enrollment.userId);
       const completions = allCompletions.filter(
         (c) => c.enrollmentId === enrollment.id
       );
@@ -89,12 +91,12 @@ export async function handle(request: Request) {
       return {
         id: enrollment.id,
         courseId: enrollment.courseId,
-        courseName: enrollment.courseName,
-        totalLessons: enrollment.totalLessons,
-        skillLevel: enrollment.skillLevel,
+        courseName: course?.name ?? "",
+        totalLessons: course?.totalLessons ?? 0,
+        skillLevel: course?.skillLevel ?? null,
         userId: enrollment.userId,
-        studentName: enrollment.studentName,
-        studentEmail: enrollment.studentEmail,
+        studentName: user?.displayName ?? user?.email ?? "",
+        studentEmail: user?.email ?? "",
         status: enrollment.status,
         enrolledAt: enrollment.enrolledAt ? new Date(enrollment.enrolledAt) : new Date(),
         completedAt: enrollment.completedAt ? new Date(enrollment.completedAt) : null,
