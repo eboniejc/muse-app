@@ -7,13 +7,7 @@ import { supabaseAdmin } from "../../../helpers/supabaseServer";
 
 export async function handle(request: Request) {
   try {
-    const { user } = await getServerUserSession(request);
-
-    if (user.role !== "admin") {
-      return new Response(superjson.stringify({ error: "Unauthorized" }), {
-        status: 403,
-      });
-    }
+    await getServerUserSession(request);
 
     const url = new URL(request.url);
     const searchParams = Object.fromEntries(url.searchParams.entries());

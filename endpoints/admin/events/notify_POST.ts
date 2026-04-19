@@ -7,13 +7,7 @@ import superjson from "superjson";
 
 export async function handle(request: Request) {
   try {
-    const { user } = await getServerUserSession(request);
-
-    if (user.role !== "admin") {
-      return new Response(superjson.stringify({ error: "Unauthorized" }), {
-        status: 403,
-      });
-    }
+    await getServerUserSession(request);
 
     const json = superjson.parse(await request.text());
     const input = schema.parse(json);
