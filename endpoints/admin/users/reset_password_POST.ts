@@ -28,12 +28,25 @@ export async function handle(request: Request) {
 
     const passwordHash = await generatePasswordHash(newPassword);
 
-    // Upsert into userpasswords table
-    const { error } = await supabaseAdmin
+    // Check if a password row already exists for this user
+    const { data: existing } = await supabaseAdmin
       .from("userpasswords")
-      .upsert({ userid: userRow.id, passwordhash: passwordHash }, { onConflict: "userid" });
+      .select("id")
+      .eq("userid", userRow.id)
+      .maybeSingle();
 
-    if (error) throw error;
+    if (existing) {
+      const { error } = await supabaseAdmin
+        .from("userpasswords")
+        .update({ passwordhash: passwordHash })
+        .eq("userid", userRow.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabaseAdmin
+        .from("userpasswords")
+        .insert({ userid: userRow.id, passwordhash: passwordHash });
+      if (error) throw error;
+    }
 
     return Response.json({ success: true });
   } catch (error) {

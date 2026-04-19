@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Helmet } from "react-helmet";
-import { Bell, PartyPopper, KeyRound } from "lucide-react";
+import { Bell, PartyPopper, KeyRound, Eye, EyeOff } from "lucide-react";
 import { format } from "date-fns";
 import { useScheduleEventNotifications } from "../helpers/useAdminEnrollments";
 import { useUpcomingEvents } from "../helpers/useUpcomingEvents";
@@ -13,6 +13,7 @@ export default function AdminPage() {
 
   const [resetEmail, setResetEmail] = useState("");
   const [resetPassword, setResetPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [resetStatus, setResetStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
 
@@ -75,15 +76,26 @@ export default function AdminPage() {
           </div>
           <div className={styles.resetField}>
             <label className={styles.resetLabel}>New Password</label>
-            <Input
-              type="password"
-              placeholder="Min 6 characters"
-              value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
-              disabled={resetLoading}
-              required
-              minLength={6}
-            />
+            <div className={styles.passwordWrapper}>
+              <Input
+                type={showPassword ? "text" : "password"}
+                placeholder="Min 6 characters"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                disabled={resetLoading}
+                required
+                minLength={6}
+                className={styles.passwordInput}
+              />
+              <button
+                type="button"
+                className={styles.showPasswordBtn}
+                onClick={() => setShowPassword((v) => !v)}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
           <Button type="submit" disabled={resetLoading}>
             {resetLoading ? "Saving..." : "Update Password"}

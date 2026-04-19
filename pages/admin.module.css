@@ -194,6 +194,33 @@
   color: var(--muted-foreground);
 }
 
+.passwordWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.passwordInput {
+  width: 100%;
+  padding-right: 2.5rem;
+}
+
+.showPasswordBtn {
+  position: absolute;
+  right: var(--spacing-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
+.showPasswordBtn:hover {
+  color: var(--foreground);
+}
+
 .resetMessage {
   font-size: 0.875rem;
   margin-top: var(--spacing-3);
