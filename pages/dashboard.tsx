@@ -8,7 +8,7 @@ import { useUpcomingEvents } from "../helpers/useUpcomingEvents";
 import { useCourseEnrollments } from "../helpers/useCourseEnrollments";
 import { Button } from "../components/Button";
 import { Skeleton } from "../components/Skeleton";
-import { Calendar, GraduationCap, ArrowRight, PartyPopper } from "lucide-react";
+import { Calendar, GraduationCap, ArrowRight, PartyPopper, Trophy } from "lucide-react";
 import { format } from "date-fns";
 import styles from "./dashboard.module.css";
 
@@ -73,14 +73,16 @@ export default function DashboardPage() {
               <Skeleton className="h-20 w-full" />
             ) : lessons && lessons.length > 0 ? (
               lessons.slice(0, 3).map((lesson) => (
-                <div key={lesson.id} className={styles.listItem}>
+                <div key={`${lesson.type}-${lesson.id}`} className={styles.listItem}>
                   <div className={styles.dateBox}>
                     <span className={styles.day}>{format(new Date(lesson.scheduledAt), "dd")}</span>
                     <span className={styles.month}>{format(new Date(lesson.scheduledAt), "MMM")}</span>
                   </div>
                   <div className={styles.itemDetails}>
                     <h3 className={styles.itemTitle}>
-                      {lesson.courseName} - Lesson {lesson.lessonNumber}
+                      {lesson.type === "contest"
+                        ? <><Trophy size={14} style={{ display: "inline", marginRight: 4, color: "var(--warning, #f59e0b)" }} />{lesson.courseName} — Module {lesson.moduleNumber} Contest</>
+                        : <>{lesson.courseName} - Lesson {lesson.lessonNumber}</>}
                     </h3>
                     <p className={styles.itemSub}>
                       {format(new Date(lesson.scheduledAt), "h:mm a")}

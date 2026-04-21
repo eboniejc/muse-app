@@ -112,26 +112,27 @@ export async function handle(request: Request) {
       );
     }
 
-    const courseIds = Array.from(
-      new Set(
-        scheduleRows
-          .map((s: any) => enrollmentMap.get(String(s.enrollmentId))?.courseId)
-          .filter(Boolean)
-      )
+    // Fetch upcoming contests in parallel with course lookup
+    const allEnrollmentCourseIds = Array.from(
+      new Set(enrollmentRows.map((e: any) => e.courseId).filter(Boolean))
     );
 
-    let courses: any[] = [];
-    if (courseIds.length > 0) {
-      const { data, error } = await supabaseAdmin
-        .from("courses")
-        .select("id,name")
-        .in("id", courseIds as any);
-      if (error && !isSchemaError(error)) throw error;
-      courses = data ?? [];
-    }
-    const courseMap = new Map(courses.map((c: any) => [String(c.id), c.name]));
+    const [coursesResult, contestResult] = await Promise.all([
+      allEnrollmentCourseIds.length > 0
+        ? supabaseAdmin.from("courses").select("id,name").in("id", allEnrollmentCourseIds as any)
+        : Promise.resolve({ data: [], error: null }),
+      supabaseAdmin
+        .from("contestSchedules")
+        .select("id,enrollmentId,moduleNumber,scheduledAt")
+        .in("enrollmentId", enrollmentIds as any[])
+        .gte("scheduledAt", nowIso)
+        .order("scheduledAt", { ascending: true }),
+    ]);
 
-    const lessons = scheduleRows.map((s: any) => {
+    if (coursesResult.error && !isSchemaError(coursesResult.error)) throw coursesResult.error;
+    const courseMap = new Map((coursesResult.data ?? []).map((c: any) => [String(c.id), c.name]));
+
+    const lessonSessions = scheduleRows.map((s: any) => {
       const enrollment = enrollmentMap.get(String(s.enrollmentId));
       const courseId = enrollment?.courseId ?? null;
       return {
@@ -139,10 +140,31 @@ export async function handle(request: Request) {
         enrollmentId: s.enrollmentId,
         courseId,
         courseName: courseId ? courseMap.get(String(courseId)) ?? "Course" : "Course",
-        lessonNumber: s.lessonNumber,
+        type: "lesson" as const,
+        lessonNumber: s.lessonNumber as number,
+        moduleNumber: undefined as number | undefined,
         scheduledAt: s.scheduledAt,
       };
     });
+
+    const contestSessions = (contestResult.data ?? []).map((c: any) => {
+      const enrollment = enrollmentMap.get(String(c.enrollmentId));
+      const courseId = enrollment?.courseId ?? null;
+      return {
+        id: c.id,
+        enrollmentId: c.enrollmentId,
+        courseId,
+        courseName: courseId ? courseMap.get(String(courseId)) ?? "Course" : "Course",
+        type: "contest" as const,
+        lessonNumber: undefined as number | undefined,
+        moduleNumber: c.moduleNumber as number,
+        scheduledAt: c.scheduledAt,
+      };
+    });
+
+    const lessons = [...lessonSessions, ...contestSessions].sort(
+      (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+    );
 
     return new Response(
       superjson.stringify({ lessons } satisfies OutputType)

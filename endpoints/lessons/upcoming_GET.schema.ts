@@ -8,7 +8,9 @@ export type UpcomingLesson = {
   enrollmentId: number;
   courseId: number | null;
   courseName: string;
-  lessonNumber: number;
+  type: "lesson" | "contest";
+  lessonNumber?: number;
+  moduleNumber?: number;
   scheduledAt: Date | string;
 };
 

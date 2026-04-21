@@ -3,6 +3,7 @@ import { validateSheetsApiKey } from "../../helpers/validateSheetsApiKey";
 import { OutputType } from "./export_POST.schema";
 import superjson from "superjson";
 import { supabaseAdmin } from "../../helpers/supabaseServer";
+import { getModuleBoundaries } from "../../helpers/courseModules";
 
 const MAX_LESSONS = 33;
 
@@ -262,11 +263,20 @@ function buildLessonRows(input: {
   courses: any[];
   courseEnrollments: any[];
   lessonSchedules: any[];
+  contestSchedules: any[];
   users: any[];
   userProfiles: any[];
   lessonCancellations: any[];
 }): Record<string, unknown>[] {
-  const { courses, courseEnrollments, lessonSchedules, users, userProfiles, lessonCancellations } = input;
+  const { courses, courseEnrollments, lessonSchedules, contestSchedules, users, userProfiles, lessonCancellations } = input;
+
+  const contestByEnrollmentModule = new Map<string, string | null>();
+  for (const row of contestSchedules ?? []) {
+    const eid = row.enrollmentId ?? row.enrollment_id;
+    const mn = row.moduleNumber ?? row.module_number;
+    const sat = row.scheduledAt ?? row.scheduled_at ?? null;
+    if (eid && mn) contestByEnrollmentModule.set(`${eid}-${mn}`, sat);
+  }
 
   const cancelledSet = new Set<string>();
   for (const row of lessonCancellations ?? []) {
@@ -323,6 +333,8 @@ function buildLessonRows(input: {
     const totalLessons = Number(readField(course ?? {}, "totalLessons", "total_lessons") ?? 0);
     const instructorName = readField(instructor ?? {}, "displayName", "displayname") ?? "";
 
+    const boundaries = getModuleBoundaries(String(courseName ?? ""));
+
     for (let i = 1; i <= totalLessons; i++) {
       const schedule = scheduleByEnrollmentLesson.get(`${enrollmentId}-${i}`);
       const scheduledAt = readField<string | null>(schedule ?? {}, "scheduledAt", "scheduled_at") ?? null;
@@ -346,6 +358,24 @@ function buildLessonRows(input: {
         instructor: instructorName,
         status,
       });
+
+      // After this lesson, insert a contest row if it ends a module
+      const moduleIndex = boundaries.indexOf(i);
+      if (moduleIndex !== -1) {
+        const moduleNumber = moduleIndex + 1;
+        const contestAt = contestByEnrollmentModule.get(`${enrollmentId}-${moduleNumber}`) ?? null;
+        const contestMs = contestAt ? new Date(contestAt).getTime() : NaN;
+        rows.push({
+          enrollmentId,
+          studentName,
+          email,
+          courseName,
+          lessonNumber: `Contest ${moduleNumber}`,
+          scheduledAt: contestAt,
+          instructor: instructorName,
+          status: Number.isFinite(contestMs) && contestMs + oneHourMs <= nowMs ? "completed" : "",
+        });
+      }
     }
   }
 
@@ -372,6 +402,7 @@ export async function handle(request: Request) {
       users,
       userProfiles,
       lessonCancellations,
+      contestSchedulesResult,
     ] = await Promise.all([
       safeSelectCourses(),
       safeSelectEbooks(),
@@ -384,7 +415,9 @@ export async function handle(request: Request) {
       safeSelectUsers(),
       safeSelectUserProfiles(),
       safeSelectAll("lessonCancellations"),
+      supabaseAdmin.from("contestSchedules").select("enrollmentId, moduleNumber, scheduledAt"),
     ]);
+    const contestSchedules = (contestSchedulesResult as any)?.data ?? [];
 
     const flattenedEnrollments = buildFlattenedEnrollments({
       courses,
@@ -529,6 +562,7 @@ export async function handle(request: Request) {
         courses,
         courseEnrollments,
         lessonSchedules,
+        contestSchedules,
         users,
         userProfiles,
         lessonCancellations,

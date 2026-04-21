@@ -470,15 +470,33 @@ async function handleFlattenedEnrollmentsImport(rows: any[]) {
 
 // Handles the new row-per-lesson sheet format.
 // Each row has: enrollmentId, lessonNumber, scheduledAt (ISO string or null).
+// Rows where lessonNumber is "Contest N" are routed to contestSchedules.
 // Non-null scheduledAt → upsert. Null scheduledAt → delete.
 async function handleLessonRowsImport(rows: any[]) {
   const scheduleRows: Array<Record<string, any>> = [];
   const deleteRows: Array<{ enrollmentId: string | number; lessonNumber: number }> = [];
+  const contestUpsertRows: Array<{ enrollmentId: string | number; moduleNumber: number; scheduledAt: string }> = [];
+  const contestDeleteRows: Array<{ enrollmentId: string | number; moduleNumber: number }> = [];
 
   for (const raw of rows as Array<Record<string, any>>) {
     const enrollmentId = raw.enrollmentId ?? null;
+    if (!enrollmentId) continue;
+
+    const lessonRaw = String(raw.lessonNumber ?? "");
+    const contestMatch = lessonRaw.match(/^Contest\s*(\d+)$/i);
+    if (contestMatch) {
+      const moduleNumber = Number(contestMatch[1]);
+      const scheduledAt = raw.scheduledAt ?? null;
+      if (scheduledAt && moduleNumber) {
+        contestUpsertRows.push({ enrollmentId, moduleNumber, scheduledAt });
+      } else if (moduleNumber) {
+        contestDeleteRows.push({ enrollmentId, moduleNumber });
+      }
+      continue;
+    }
+
     const lessonNumber = Number(raw.lessonNumber ?? 0);
-    if (!enrollmentId || !lessonNumber) continue;
+    if (!lessonNumber) continue;
 
     const scheduledAt = raw.scheduledAt ?? null;
     if (scheduledAt) {
@@ -488,9 +506,24 @@ async function handleLessonRowsImport(rows: any[]) {
     }
   }
 
+  // Upsert contest schedules
+  for (const row of contestUpsertRows) {
+    await supabaseAdmin
+      .from("contestSchedules")
+      .upsert({ enrollmentId: row.enrollmentId, moduleNumber: row.moduleNumber, scheduledAt: row.scheduledAt }, { onConflict: "enrollmentId,moduleNumber" });
+  }
+  // Delete blanked-out contest schedules
+  for (const row of contestDeleteRows) {
+    await supabaseAdmin
+      .from("contestSchedules")
+      .delete()
+      .eq("enrollmentId", row.enrollmentId as any)
+      .eq("moduleNumber", row.moduleNumber as any);
+  }
+
   const deleteCount = await handleLessonSchedulesDelete(deleteRows);
   const scheduleCount = await handleLessonSchedulesImport(scheduleRows);
-  return scheduleCount + deleteCount;
+  return scheduleCount + deleteCount + contestUpsertRows.length + contestDeleteRows.length;
 }
 
 async function handleLessonSchedulesDelete(
