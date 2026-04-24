@@ -23,17 +23,30 @@ async function safeSelectAll(table: string) {
 }
 
 async function safeSelectCourseEnrollments() {
-  // Always use Supabase directly — Kysely's CamelCasePlugin translates
-  // "courseEnrollments" → "course_enrollments" (a different table), which
-  // returns the wrong enrollment IDs and breaks lessonSchedules FK inserts.
-  const { data, error } = await supabaseAdmin
-    .from("courseEnrollments")
-    .select("*");
-  if (error) {
-    console.error("Sheets export: failed Supabase query for courseEnrollments:", error);
-    return [];
+  // Query both tables and merge, deduplicating by id.
+  // Kysely's CamelCasePlugin translates "courseEnrollments" → "course_enrollments",
+  // so we use Supabase directly for both to avoid that collision.
+  const [camel, snake] = await Promise.all([
+    supabaseAdmin.from("courseEnrollments").select("*"),
+    supabaseAdmin.from("course_enrollments").select("*"),
+  ]);
+
+  if (camel.error) {
+    console.error("Sheets export: failed Supabase query for courseEnrollments:", camel.error);
   }
-  return data ?? [];
+  if (snake.error) {
+    console.error("Sheets export: failed Supabase query for course_enrollments:", snake.error);
+  }
+
+  const seen = new Set<string>();
+  const merged: any[] = [];
+  for (const row of [...(camel.data ?? []), ...(snake.data ?? [])]) {
+    const id = String(row.id ?? row.ID ?? "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(row);
+  }
+  return merged;
 }
 
 async function safeSelectUsers() {

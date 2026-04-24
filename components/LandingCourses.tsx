@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useCourses } from "../helpers/useCourses";
 import { Button } from "./Button";
 import { Skeleton } from "./Skeleton";
-import { Badge } from "./Badge";
+import { CourseCard } from "./CourseCard";
 import styles from "./LandingCourses.module.css";
 
 export const LandingCourses = () => {
@@ -24,39 +24,15 @@ export const LandingCourses = () => {
         <div className={styles.grid}>
           {isLoading ? (
             Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className={styles.card}>
-                <Skeleton className="h-48 w-full mb-4" />
-                <Skeleton className="h-6 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-full" />
+              <div key={i} className={styles.skeletonCard}>
+                <Skeleton className="h-8 w-3/4 mb-4" />
+                <Skeleton className="h-24 w-full mb-4" />
+                <Skeleton className="h-10 w-full" />
               </div>
             ))
           ) : (
             courses?.map((course) => (
-              <div key={course.id} className={styles.card}>
-                <div className={styles.cardContent}>
-                  <div className={styles.badges}>
-                    <Badge variant="secondary">{course.skillLevel}</Badge>
-                    <Badge variant="outline">
-                      {course.durationWeeks} {t("courses.weeks")}
-                    </Badge>
-                  </div>
-                  <h3 className={styles.courseTitle}>{course.name}</h3>
-                  {course.price && (
-                    <div className={styles.price}>
-                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(course.price))}
-                    </div>
-                  )}
-                  <p className={styles.courseDesc}>{course.description}</p>
-                  <div className={styles.instructor}>
-                    <span className={styles.instructorLabel}>
-                      {t("courses.instructor")}
-                    </span>
-                    <span className={styles.instructorName}>
-                      {course.instructorName || t("common.tba")}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <CourseCard key={course.id} course={course} showEnrollment={false} />
             ))
           )}
         </div>

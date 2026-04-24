@@ -10,9 +10,10 @@ import styles from "./CourseCard.module.css";
 
 interface CourseCardProps {
   course: CourseWithDetails;
+  showEnrollment?: boolean;
 }
 
-export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
+export const CourseCard: React.FC<CourseCardProps> = ({ course, showEnrollment = true }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: enrollments } = useCourseEnrollments();
@@ -39,7 +40,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
       <div className={styles.header}>
         <div className={styles.badges}>
           <Badge variant="secondary">{course.skillLevel}</Badge>
-          {isEnrolled && <Badge variant="success">Enrolled</Badge>}
+          {showEnrollment && isEnrolled && <Badge variant="success">Enrolled</Badge>}
         </div>
         <h3 className={styles.title}>{course.name}</h3>
       </div>
@@ -49,34 +50,38 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course }) => {
       <div className={styles.meta}>
         <div className={styles.metaItem}>
           <BookOpen size={16} />
-                    <span>
+          <span>
             {course.totalLessons} {t("courses.weeks")}
           </span>
         </div>
-        <div className={styles.metaItem}>
-          <Users size={16} />
-                    <span>
-            {course.enrolledCount} Students
-          </span>
-        </div>
+        {showEnrollment && (
+          <div className={styles.metaItem}>
+            <Users size={16} />
+            <span>
+              {course.enrolledCount} Students
+            </span>
+          </div>
+        )}
       </div>
 
-      {isEnrolled && enrollment ? (
-        <div className={styles.footer}>
-          <div className={styles.price}>Enrolled</div>
-          <Button onClick={() => navigate("/dashboard")} className={styles.enrollBtn} variant="secondary">
-            View Dashboard
-          </Button>
-        </div>
-      ) : (
-        <div className={styles.footer}>
-          <div className={styles.price}>
-            {course.price ? `$${course.price}` : "Free"}
+      {showEnrollment && (
+        isEnrolled && enrollment ? (
+          <div className={styles.footer}>
+            <div className={styles.price}>Enrolled</div>
+            <Button onClick={() => navigate("/dashboard")} className={styles.enrollBtn} variant="secondary">
+              View Dashboard
+            </Button>
           </div>
-          <Button onClick={handleEnrollClick} className={styles.enrollBtn}>
-            {t("courses.enroll")}
-          </Button>
-        </div>
+        ) : (
+          <div className={styles.footer}>
+            <div className={styles.price}>
+              {course.price ? `$${course.price}` : "Free"}
+            </div>
+            <Button onClick={handleEnrollClick} className={styles.enrollBtn}>
+              {t("courses.enroll")}
+            </Button>
+          </div>
+        )
       )}
     </div>
   );
