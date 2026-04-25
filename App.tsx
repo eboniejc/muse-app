@@ -27,6 +27,8 @@ import Page_11 from "./pages/forgot-password.tsx";
 import PageLayout_11 from "./pages/forgot-password.pageLayout.tsx";
 import Page_12 from "./pages/reset-password.tsx";
 import PageLayout_12 from "./pages/reset-password.pageLayout.tsx";
+import Page_13 from "./pages/settings.tsx";
+import PageLayout_13 from "./pages/settings.pageLayout.tsx";
 import "./base.css";
 
 if (!window.requestIdleCallback) {
@@ -35,7 +37,7 @@ if (!window.requestIdleCallback) {
   };
 }
 
-const fileNameToRoute = new Map([["./pages/login.tsx","/login"],["./pages/_index.tsx","/"],["./pages/ebooks.tsx","/ebooks"],["./pages/courses.tsx","/courses"],["./pages/schedule.tsx","/schedule"],["./pages/dashboard.tsx","/dashboard"],["./pages/instructors.tsx","/instructors"],["./pages/complete-registration.tsx","/complete-registration"],["./pages/courses.$courseId.enroll.tsx","/courses/:courseId/enroll"],["./pages/admin.tsx","/admin"],["./pages/instructor-schedule.tsx","/instructor-schedule"],["./pages/forgot-password.tsx","/forgot-password"],["./pages/reset-password.tsx","/reset-password"]]);
+const fileNameToRoute = new Map([["./pages/login.tsx","/login"],["./pages/_index.tsx","/"],["./pages/ebooks.tsx","/ebooks"],["./pages/courses.tsx","/courses"],["./pages/schedule.tsx","/schedule"],["./pages/dashboard.tsx","/dashboard"],["./pages/instructors.tsx","/instructors"],["./pages/complete-registration.tsx","/complete-registration"],["./pages/courses.$courseId.enroll.tsx","/courses/:courseId/enroll"],["./pages/admin.tsx","/admin"],["./pages/instructor-schedule.tsx","/instructor-schedule"],["./pages/forgot-password.tsx","/forgot-password"],["./pages/reset-password.tsx","/reset-password"],["./pages/settings.tsx","/settings"]]);
 const fileNameToComponent = new Map([
     ["./pages/login.tsx", Page_0],
 ["./pages/_index.tsx", Page_1],
@@ -50,6 +52,7 @@ const fileNameToComponent = new Map([
 ["./pages/instructor-schedule.tsx", Page_10],
 ["./pages/forgot-password.tsx", Page_11],
 ["./pages/reset-password.tsx", Page_12],
+["./pages/settings.tsx", Page_13],
   ]);
 
 function makePageRoute(filename: string) {
@@ -162,6 +165,7 @@ export function App() {
 "./pages/instructor-schedule.tsx": PageLayout_10,
 "./pages/forgot-password.tsx": PageLayout_11,
 "./pages/reset-password.tsx": PageLayout_12,
+"./pages/settings.tsx": PageLayout_13,
 }), fileNameToRoute, makePageRoute })} 
           <Route path="*" element={<NotFound />} />
         </Routes>

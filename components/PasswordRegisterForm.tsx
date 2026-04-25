@@ -146,7 +146,7 @@ export const PasswordRegisterForm: React.FC<PasswordRegisterFormProps> = ({
             />
           </FormControl>
           <FormDescription>
-            At least 12 characters with uppercase, lowercase, number, and special character. Avoid common passwords or using your email/name.
+            At least 6 characters.
           </FormDescription>
           <FormMessage />
         </FormItem>

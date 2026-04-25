@@ -1,13 +1,38 @@
 // Module boundaries per course — the lesson number after which each module's contest falls.
 // Module number = index + 1 (1-based).
 const MODULE_BOUNDARIES: Record<string, number[]> = {
+  // Complete DJ Course
+  "complete dj course (group)": [9, 14, 21, 28, 33],
   "complete dj course": [9, 14, 21, 28, 33],
+  "complete dj course (online)": [9, 14, 21, 28, 33],
+
+  // Professional EDM DJ Course
   "professional edm dj course": [9, 13, 18, 23],
-  "professional hiphop dj course": [9, 12, 17, 24, 29],
-  "beginner dj course": [8],
-  "intermediate dj course": [5, 9, 14],
-  "advance dj course": [21, 26],
+  "professional edm dj course (online)": [9, 13, 18, 23],
+
+  // Professional HipHop DJ Course
+  "professional hiphop music dj course": [9, 12, 17, 24, 29],
+  "professional urban music dj course (online)": [9, 12, 17, 24, 29],
+
+  // Beginner DJ Course
+  "level 1 - beginner dj course (group)": [8],
+  "level 1 - beginner dj course": [8],
+  "level 1 - beginner dj course (online)": [8],
+
+  // Intermediate DJ Course
+  "level 2 - intermediate dj course (group)": [5, 9, 14],
+  "level 2 - intermediate dj course": [5, 9, 14],
+  "level 2 - intermediate dj course (online)": [5, 9, 14],
+
+  // Advance DJ Course
+  "level 3 - advance dj course": [21, 26],
+  "level 3 - advance dj course (group)": [21, 26],
+  "level 3 - advance dj course (online)": [21, 26],
+
+  // Kid DJ Course
   "kid dj course": [11],
+  "kid dj course (group)": [11],
+  "kid dj course (online)": [11],
 };
 
 /**

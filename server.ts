@@ -496,6 +496,26 @@ app.get('_api/instructor/schedule',async c => {
     return c.text("Error loading endpoint code " + e.message,  500)
   }
 })
+app.post('_api/user/update_email',async c => {
+  try {
+    const { handle } = await importEndpoint("./endpoints/user/update_email_POST");
+    const response = await handle(c.req.raw);
+    return response;
+  } catch (e: any) {
+    console.error(e);
+    return c.text("Error loading endpoint code " + e.message, 500)
+  }
+})
+app.post('_api/user/update_password',async c => {
+  try {
+    const { handle } = await importEndpoint("./endpoints/user/update_password_POST");
+    const response = await handle(c.req.raw);
+    return response;
+  } catch (e: any) {
+    console.error(e);
+    return c.text("Error loading endpoint code " + e.message, 500)
+  }
+})
 app.use("/*", serveStatic({ root: "./static" }));
 app.use("/*", serveStatic({ root: "./dist" }));
 app.get("*", async (c, next) => {
