@@ -1,12 +1,8 @@
-import { getServerUserSession } from "../../../helpers/getServerUserSession";
-import { NotAuthenticatedError } from "../../../helpers/getSetServerSession";
 import { supabaseAdmin } from "../../../helpers/supabaseServer";
 import { generatePasswordHash } from "../../../helpers/generatePasswordHash";
 
 export async function handle(request: Request) {
   try {
-    await getServerUserSession(request);
-
     const { email, newPassword } = await request.json();
 
     if (!email || typeof email !== "string") {
@@ -50,9 +46,6 @@ export async function handle(request: Request) {
 
     return Response.json({ success: true });
   } catch (error) {
-    if (error instanceof NotAuthenticatedError) {
-      return Response.json({ message: "Not authenticated" }, { status: 401 });
-    }
     console.error("Admin reset password error:", error);
     return Response.json({ message: "Something went wrong" }, { status: 500 });
   }
