@@ -164,20 +164,39 @@ export async function handle(request: Request): Promise<Response> {
     );
   }
 
-  // Look up lesson schedule
-  const { data: schedule } = await supabaseAdmin
+  // Look up lesson schedule — try camelCase table first, fall back to snake_case
+  let { data: schedule } = await supabaseAdmin
     .from("lessonSchedules")
     .select("scheduledAt")
     .eq("enrollmentId", enrollmentId)
     .eq("lessonNumber", lessonNumber)
     .maybeSingle();
+  if (!schedule) {
+    const { data: snakeSchedule } = await supabaseAdmin
+      .from("lesson_schedules")
+      .select("scheduled_at")
+      .eq("enrollment_id", enrollmentId)
+      .eq("lesson_number", lessonNumber)
+      .maybeSingle();
+    if (snakeSchedule) schedule = { scheduledAt: (snakeSchedule as any).scheduled_at } as any;
+  }
 
-  // Look up enrollment → user + course
-  const { data: enrollment } = await supabaseAdmin
+  // Look up enrollment → user + course — check both tables
+  let { data: enrollment } = await supabaseAdmin
     .from("courseEnrollments")
     .select("userId, courseId")
     .eq("id", enrollmentId)
     .maybeSingle();
+  if (!enrollment) {
+    const { data: snakeEnrollment } = await supabaseAdmin
+      .from("course_enrollments")
+      .select("user_id, course_id")
+      .eq("id", enrollmentId)
+      .maybeSingle();
+    if (snakeEnrollment) {
+      enrollment = { userId: (snakeEnrollment as any).user_id, courseId: (snakeEnrollment as any).course_id } as any;
+    }
+  }
 
   let studentName = "Student";
   let studentEmail = "";

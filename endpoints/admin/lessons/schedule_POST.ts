@@ -16,13 +16,23 @@ export async function handle(request: Request) {
     const json = superjson.parse(await request.text());
     const input = schema.parse(json);
 
-    // Fetch enrollment to get the student's userId and course name via Supabase
-    // (avoids Kysely CamelCase→snake_case mismatch for "courseEnrollments" table)
-    const { data: enrollmentData } = await supabaseAdmin
+    // Fetch enrollment from both tables (two tables exist due to naming inconsistency)
+    let enrollmentData: any = null;
+    const { data: camelData } = await supabaseAdmin
       .from("courseEnrollments")
       .select("userId,courseId")
       .eq("id", input.enrollmentId as any)
       .maybeSingle();
+    if (camelData) {
+      enrollmentData = camelData;
+    } else {
+      const { data: snakeData } = await supabaseAdmin
+        .from("course_enrollments")
+        .select("userId:user_id,courseId:course_id")
+        .eq("id", input.enrollmentId as any)
+        .maybeSingle();
+      if (snakeData) enrollmentData = snakeData;
+    }
 
     let enrollment: { userId: number; courseName: string } | null = null;
     if (enrollmentData) {

@@ -1,12 +1,13 @@
 import { db } from "../../../helpers/db";
 import { getServerUserSession } from "../../../helpers/getServerUserSession";
+import { supabaseAdmin } from "../../../helpers/supabaseServer";
 import { schema, OutputType } from "./complete_POST.schema";
 import superjson from "superjson";
 import { NotAuthenticatedError } from "../../../helpers/getSetServerSession";
 
 export async function handle(request: Request) {
   try {
-    await getServerUserSession(request);
+    const { user } = await getServerUserSession(request);
 
     const json = superjson.parse(await request.text());
     const input = schema.parse(json);
@@ -25,13 +26,24 @@ export async function handle(request: Request) {
       )
       .execute();
 
-    // 2. Fetch enrollment info to recalculate progress
-    const enrollment = await db
-      .selectFrom("courseEnrollments")
-      .innerJoin("courses", "courseEnrollments.courseId", "courses.id")
-      .select(["courseEnrollments.id", "courses.totalLessons"])
-      .where("courseEnrollments.id", "=", input.enrollmentId)
-      .executeTakeFirstOrThrow();
+    // 2. Fetch enrollment + course from both tables
+    let enrollmentTable = "courseEnrollments";
+    let { data: enrollmentData } = await supabaseAdmin
+      .from("courseEnrollments")
+      .select("id, courseId, courses(totalLessons)")
+      .eq("id", input.enrollmentId as any)
+      .maybeSingle();
+    if (!enrollmentData) {
+      enrollmentTable = "course_enrollments";
+      const { data } = await supabaseAdmin
+        .from("course_enrollments")
+        .select("id, courseId:course_id, courses(totalLessons:total_lessons)")
+        .eq("id", input.enrollmentId as any)
+        .maybeSingle();
+      enrollmentData = data;
+    }
+    if (!enrollmentData) throw new Error("Enrollment not found");
+    const totalLessons = Number((enrollmentData as any).courses?.totalLessons ?? (enrollmentData as any).courses?.total_lessons ?? 0);
 
     // 3. Count completed lessons for this enrollment
     const completionCount = await db
@@ -39,33 +51,26 @@ export async function handle(request: Request) {
       .where("enrollmentId", "=", input.enrollmentId)
       .select((eb) => eb.fn.count("id").as("count"))
       .executeTakeFirst();
-    
+
     const completedLessons = Number(completionCount?.count ?? 0);
-    const totalLessons = enrollment.totalLessons;
     const progressPercentage = Math.min(
       100,
       Math.round((completedLessons / totalLessons) * 100)
     );
 
-    // 4. Update enrollment
-    let statusUpdate: any = {
-      progressPercentage,
-    };
-
-    // If all lessons are done, mark as completed
+    // 4. Update enrollment in whichever table it came from
+    let statusUpdate: any = { progressPercentage };
     if (completedLessons >= totalLessons) {
-      statusUpdate = {
-        ...statusUpdate,
-        status: "completed",
-        completedAt: new Date(),
-      };
+      statusUpdate = { ...statusUpdate, status: "completed", completedAt: new Date().toISOString() };
     }
 
-    await db
-      .updateTable("courseEnrollments")
-      .set(statusUpdate)
-      .where("id", "=", input.enrollmentId)
-      .execute();
+    await supabaseAdmin
+      .from(enrollmentTable as any)
+      .update(enrollmentTable === "courseEnrollments" ? statusUpdate : {
+        progress_percentage: statusUpdate.progressPercentage,
+        ...(statusUpdate.status ? { status: statusUpdate.status, completed_at: statusUpdate.completedAt } : {}),
+      })
+      .eq("id", input.enrollmentId as any);
 
     return new Response(
       superjson.stringify({

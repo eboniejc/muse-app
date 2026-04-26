@@ -59,19 +59,20 @@ export async function handle(request: Request) {
       );
     }
 
-    // Get enrollment counts for each course
-    const { data: enrollmentCounts, error: enrollErr } = await supabaseAdmin
-      .from('courseEnrollments')
-      .select('courseId')
-      .eq('status', 'active');
+    // Get enrollment counts from both tables and merge
+    const [camelEnroll, snakeEnroll] = await Promise.all([
+      supabaseAdmin.from('courseEnrollments').select('courseId').eq('status', 'active'),
+      supabaseAdmin.from('course_enrollments').select('courseId').eq('status', 'active'),
+    ]);
 
-    if (enrollErr && !isMissingTableError(enrollErr, "courseEnrollments")) {
-      throw enrollErr;
+    if (camelEnroll.error && !isMissingTableError(camelEnroll.error, "courseEnrollments")) {
+      throw camelEnroll.error;
     }
 
     const countMap = new Map<string, number>();
-    (enrollmentCounts || []).forEach((e: any) => {
-      countMap.set(e.courseId, (countMap.get(e.courseId) || 0) + 1);
+    [...(camelEnroll.data || []), ...(snakeEnroll.data || [])].forEach((e: any) => {
+      const id = String(e.courseId ?? e.course_id);
+      countMap.set(id, (countMap.get(id) || 0) + 1);
     });
 
     const mappedCourses = (courses || []).map((course: any) => ({
@@ -86,7 +87,7 @@ export async function handle(request: Request) {
       instructorId: course.instructorId,
       instructorName: course.users?.displayname || null,
       instructorAvatar: course.users?.avatarUrl || course.users?.avatarurl || null,
-      enrolledCount: countMap.get(course.id) || 0,
+      enrolledCount: countMap.get(String(course.id)) || 0,
       coverImageUrl: course.coverImageUrl || null,
     }));
 

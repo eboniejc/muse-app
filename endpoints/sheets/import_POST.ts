@@ -249,6 +249,10 @@ function isSchemaError(error: any): boolean {
   );
 }
 
+function isForeignKeyError(error: any): boolean {
+  return error?.code === "23503";
+}
+
 function isMissingEventNotificationColumnError(error: any): boolean {
   const message = String(error?.message ?? "");
   if (error?.code !== "PGRST204") return false;
@@ -798,7 +802,18 @@ async function handleLessonSchedulesImport(rows: any[]) {
         .eq("id", existingSchedule.id);
       if (error) throw error;
     } else {
-      const { error } = await supabaseAdmin.from(scheduleTable).insert(scheduleData);
+      let { error } = await supabaseAdmin.from(scheduleTable).insert(scheduleData);
+      if (error && isForeignKeyError(error) && scheduleTable === "lessonSchedules") {
+        // enrollmentId belongs to course_enrollments, not courseEnrollments — use snake_case table
+        const snakeData = {
+          enrollment_id: row.enrollmentId,
+          lesson_number: row.lessonNumber,
+          scheduled_at: scheduledDate.toISOString(),
+          notification_1h_id: scheduleData.notification1hId ?? null,
+          notification_24h_id: scheduleData.notification24hId ?? null,
+        };
+        ({ error } = await supabaseAdmin.from("lesson_schedules").insert(snakeData));
+      }
       if (error) throw error;
     }
 

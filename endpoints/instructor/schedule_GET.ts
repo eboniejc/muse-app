@@ -47,16 +47,22 @@ export async function handle(request: Request) {
     const courseIds = courses.map((c: any) => c.id);
     const courseMap = new Map(courses.map((c: any) => [String(c.id), c.name]));
 
-    // Fetch enrollments for these courses via Supabase
-    const { data: rawEnrollments, error: enrollErr } = await supabaseAdmin
-      .from("courseEnrollments")
-      .select("id,userId,courseId")
-      .in("courseId", courseIds as any[])
-      .in("status", ["active", "completed"]);
+    // Fetch enrollments from both tables and merge
+    const [camelEnroll, snakeEnroll] = await Promise.all([
+      supabaseAdmin.from("courseEnrollments").select("id,userId,courseId").in("courseId", courseIds as any[]).in("status", ["active", "completed"]),
+      supabaseAdmin.from("course_enrollments").select("id,userId:user_id,courseId:course_id").in("course_id", courseIds as any[]).in("status", ["active", "completed"]),
+    ]);
 
-    if (enrollErr && !isSchemaError(enrollErr)) throw enrollErr;
+    if (camelEnroll.error && !isSchemaError(camelEnroll.error)) throw camelEnroll.error;
 
-    const enrollments = rawEnrollments ?? [];
+    const seenEnrollIds = new Set<string>();
+    const enrollments: any[] = [];
+    for (const row of [...(camelEnroll.data ?? []), ...(snakeEnroll.data ?? [])]) {
+      const id = String(row.id ?? "");
+      if (!id || seenEnrollIds.has(id)) continue;
+      seenEnrollIds.add(id);
+      enrollments.push(row);
+    }
     if (enrollments.length === 0) {
       return new Response(
         superjson.stringify({ lessons: [] } satisfies OutputType)

@@ -16,23 +16,37 @@ export async function handle(request: Request) {
         status: searchParams.status || undefined
     });
 
-    // Use Supabase directly — Kysely's CamelCasePlugin translates
-    // "courseEnrollments" → "course_enrollments" (a different table).
-    let ceQuery = supabaseAdmin
+    // Query both tables and merge — two tables exist due to naming inconsistency.
+    let camelQuery = supabaseAdmin
       .from("courseEnrollments")
       .select("id, courseId, userId, status, enrolledAt, completedAt, progressPercentage")
       .order("enrolledAt", { ascending: false });
+    let snakeQuery = supabaseAdmin
+      .from("course_enrollments")
+      .select("id, courseId:course_id, userId:user_id, status, enrolledAt:enrolled_at, completedAt:completed_at, progressPercentage:progress_percentage")
+      .order("enrolled_at", { ascending: false });
 
     if (queryInput.courseId) {
-      ceQuery = ceQuery.eq("courseId", queryInput.courseId as any);
+      camelQuery = camelQuery.eq("courseId", queryInput.courseId as any);
+      snakeQuery = snakeQuery.eq("course_id", queryInput.courseId as any);
     }
     if (queryInput.status) {
-      ceQuery = ceQuery.eq("status", queryInput.status as any);
+      camelQuery = camelQuery.eq("status", queryInput.status as any);
+      snakeQuery = snakeQuery.eq("status", queryInput.status as any);
     }
 
-    const { data: ceRows, error: ceErr } = await ceQuery;
-    if (ceErr) throw ceErr;
-    const enrollmentRows = ceRows ?? [];
+    const [{ data: camelRows, error: camelErr }, { data: snakeRows }] = await Promise.all([camelQuery, snakeQuery]);
+    if (camelErr) throw camelErr;
+
+    const seen = new Set<string>();
+    const enrollmentRows: any[] = [];
+    for (const row of [...(camelRows ?? []), ...(snakeRows ?? [])]) {
+      const id = String(row.id ?? "");
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      enrollmentRows.push(row);
+    }
+    enrollmentRows.sort((a, b) => new Date(b.enrolledAt ?? 0).getTime() - new Date(a.enrolledAt ?? 0).getTime());
 
     if (enrollmentRows.length === 0) {
       return new Response(

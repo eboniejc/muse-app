@@ -60,16 +60,13 @@ export async function handle(request: Request) {
         .executeTakeFirst();
     } catch (error) {
       if (!isSchemaOrMissingTableError(error)) throw error;
-      const { data, error: restErr } = await supabaseAdmin
-        .from("courseEnrollments")
-        .select("id")
-        .eq("userId", user.id as any)
-        .eq("courseId", courseId)
-        .in("status", ["active", "paused"])
-        .limit(1)
-        .maybeSingle();
-      if (restErr) throw restErr;
-      existingEnrollment = data;
+    }
+    if (!existingEnrollment) {
+      const [camel, snake] = await Promise.all([
+        supabaseAdmin.from("courseEnrollments").select("id").eq("userId", user.id as any).eq("courseId", courseId).in("status", ["active", "paused"]).limit(1).maybeSingle(),
+        supabaseAdmin.from("course_enrollments").select("id").eq("userId", user.id as any).eq("courseId", courseId).in("status", ["active", "paused"]).limit(1).maybeSingle(),
+      ]);
+      existingEnrollment = camel.data ?? snake.data ?? null;
     }
 
     if (existingEnrollment) {
@@ -91,13 +88,13 @@ export async function handle(request: Request) {
         count = Number(currentEnrollments?.count ?? 0);
       } catch (error) {
         if (!isSchemaOrMissingTableError(error)) throw error;
-        const { count: restCount, error: restErr } = await supabaseAdmin
-          .from("courseEnrollments")
-          .select("id", { count: "exact", head: true })
-          .eq("courseId", courseId)
-          .eq("status", "active");
-        if (restErr) throw restErr;
-        count = Number(restCount ?? 0);
+      }
+      if (!count) {
+        const [camel, snake] = await Promise.all([
+          supabaseAdmin.from("courseEnrollments").select("id", { count: "exact", head: true }).eq("courseId", courseId).eq("status", "active"),
+          supabaseAdmin.from("course_enrollments").select("id", { count: "exact", head: true }).eq("courseId", courseId).eq("status", "active"),
+        ]);
+        count = Number(camel.count ?? 0) + Number(snake.count ?? 0);
       }
 
       if (count >= course.maxStudents) {
