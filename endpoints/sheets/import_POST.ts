@@ -510,11 +510,16 @@ async function handleLessonRowsImport(rows: any[]) {
     }
   }
 
-  // Upsert contest schedules
+  // Upsert contest schedules — fall back to snake_case table on FK violation
   for (const row of contestUpsertRows) {
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("contestSchedules")
       .upsert({ enrollmentId: row.enrollmentId, moduleNumber: row.moduleNumber, scheduledAt: row.scheduledAt }, { onConflict: "enrollmentId,moduleNumber" });
+    if (error && isForeignKeyError(error)) {
+      await supabaseAdmin
+        .from("contest_schedules")
+        .upsert({ enrollment_id: row.enrollmentId, module_number: row.moduleNumber, scheduled_at: row.scheduledAt }, { onConflict: "enrollment_id,module_number" });
+    }
   }
   // Delete blanked-out contest schedules
   for (const row of contestDeleteRows) {
