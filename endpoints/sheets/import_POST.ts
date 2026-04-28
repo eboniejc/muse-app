@@ -249,9 +249,6 @@ function isSchemaError(error: any): boolean {
   );
 }
 
-function isForeignKeyError(error: any): boolean {
-  return error?.code === "23503";
-}
 
 function isMissingEventNotificationColumnError(error: any): boolean {
   const message = String(error?.message ?? "");
@@ -510,16 +507,11 @@ async function handleLessonRowsImport(rows: any[]) {
     }
   }
 
-  // Upsert contest schedules — fall back to snake_case table on FK violation
   for (const row of contestUpsertRows) {
     const { error } = await supabaseAdmin
       .from("contestSchedules")
       .upsert({ enrollmentId: row.enrollmentId, moduleNumber: row.moduleNumber, scheduledAt: row.scheduledAt }, { onConflict: "enrollmentId,moduleNumber" });
-    if (error && isForeignKeyError(error)) {
-      await supabaseAdmin
-        .from("contest_schedules")
-        .upsert({ enrollment_id: row.enrollmentId, module_number: row.moduleNumber, scheduled_at: row.scheduledAt }, { onConflict: "enrollment_id,module_number" });
-    }
+    if (error) throw error;
   }
   // Delete blanked-out contest schedules
   for (const row of contestDeleteRows) {
@@ -807,18 +799,7 @@ async function handleLessonSchedulesImport(rows: any[]) {
         .eq("id", existingSchedule.id);
       if (error) throw error;
     } else {
-      let { error } = await supabaseAdmin.from(scheduleTable).insert(scheduleData);
-      if (error && isForeignKeyError(error) && scheduleTable === "lessonSchedules") {
-        // enrollmentId belongs to course_enrollments, not courseEnrollments — use snake_case table
-        const snakeData = {
-          enrollment_id: row.enrollmentId,
-          lesson_number: row.lessonNumber,
-          scheduled_at: scheduledDate.toISOString(),
-          notification_1h_id: scheduleData.notification1hId ?? null,
-          notification_24h_id: scheduleData.notification24hId ?? null,
-        };
-        ({ error } = await supabaseAdmin.from("lesson_schedules").insert(snakeData));
-      }
+      const { error } = await supabaseAdmin.from(scheduleTable).insert(scheduleData);
       if (error) throw error;
     }
 
