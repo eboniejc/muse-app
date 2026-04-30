@@ -211,15 +211,16 @@ function pullFromApp() {
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('Fetching data from app…', 'MUSE INC Sync', 60);
 
-    // ── Lessons + Events ──────────────────────────────────────────────────────
-    var res = UrlFetchApp.fetch(appUrl + '/_api/sheets/export', {
-      method: 'post',
-      headers: { 'x-api-key': apiKey },
-      muteHttpExceptions: true
-    });
-    if (res.getResponseCode() !== 200) throw new Error('Export failed ' + res.getResponseCode() + ': ' + res.getContentText());
+    // ── Fetch all three endpoints in parallel ─────────────────────────────────
+    var responses = UrlFetchApp.fetchAll([
+      { url: appUrl + '/_api/sheets/export',                  method: 'post', headers: { 'x-api-key': apiKey }, muteHttpExceptions: true },
+      { url: appUrl + '/_api/sheets/rooms-export',            method: 'get',  headers: { 'x-api-key': apiKey }, muteHttpExceptions: true },
+      { url: appUrl + '/_api/sheets/practice-hours-export',   method: 'get',  headers: { 'x-api-key': apiKey }, muteHttpExceptions: true },
+    ]);
 
-    var parsed        = parseSuperJSON(res.getContentText());
+    // ── Lessons + Events ──────────────────────────────────────────────────────
+    if (responses[0].getResponseCode() !== 200) throw new Error('Export failed ' + responses[0].getResponseCode() + ': ' + responses[0].getContentText());
+    var parsed        = parseSuperJSON(responses[0].getContentText());
     var lessonRows    = (parsed && parsed.data && parsed.data.lessonRows)  || [];
     var events        = (parsed && parsed.data && parsed.data.events)      || [];
     var cancellations = (parsed && parsed.data && parsed.data.lessonCancellations) || [];
@@ -237,30 +238,20 @@ function pullFromApp() {
     if (cancellations.length) _writeCancellationsSheet(cancellations);
 
     // ── Practice Room Schedule ────────────────────────────────────────────────
-    try {
-      var roomsRes = UrlFetchApp.fetch(appUrl + '/_api/sheets/rooms-export', {
-        method: 'get',
-        headers: { 'x-api-key': apiKey },
-        muteHttpExceptions: true
-      });
-      if (roomsRes.getResponseCode() === 200) {
-        var roomsParsed = parseSuperJSON(roomsRes.getContentText());
+    if (responses[1].getResponseCode() === 200) {
+      try {
+        var roomsParsed = parseSuperJSON(responses[1].getContentText());
         _writePracticeRoomsSheet((roomsParsed && roomsParsed.bookings) || []);
-      }
-    } catch(e) { Logger.log('Practice rooms sync error: ' + e.message); }
+      } catch(e) { Logger.log('Practice rooms write error: ' + e.message); }
+    }
 
     // ── Practice Hours ────────────────────────────────────────────────────────
-    try {
-      var hoursRes = UrlFetchApp.fetch(appUrl + '/_api/sheets/practice-hours-export', {
-        method: 'get',
-        headers: { 'x-api-key': apiKey },
-        muteHttpExceptions: true
-      });
-      if (hoursRes.getResponseCode() === 200) {
-        var hoursParsed = parseSuperJSON(hoursRes.getContentText());
+    if (responses[2].getResponseCode() === 200) {
+      try {
+        var hoursParsed = parseSuperJSON(responses[2].getContentText());
         _writePracticeHoursSheet((hoursParsed && hoursParsed.students) || []);
-      }
-    } catch(e) { Logger.log('Practice hours sync error: ' + e.message); }
+      } catch(e) { Logger.log('Practice hours write error: ' + e.message); }
+    }
 
     SpreadsheetApp.getActiveSpreadsheet().toast(
       lessonRows.length + ' lessons, ' + events.length + ' events, rooms & hours synced.',
@@ -1036,10 +1027,11 @@ function _writePracticeRoomsSheet(bookings) {
     return [b.date || '', b.startTime || '', b.endTime || '', b.roomName || '', b.studentName || '', b.studentEmail || '', b.status || ''];
   });
   sheet.getRange(2, 1, values.length, headers.length).setValues(values);
-  for (var i = 0; i < values.length; i++) {
-    sheet.getRange(i + 2, 1, 1, headers.length).setBackground(i % 2 === 0 ? C.white : C.altRow);
-  }
-  sheet.autoResizeColumns(1, headers.length);
+  var rowBgs = values.map(function(_, i) {
+    var bg = i % 2 === 0 ? C.white : C.altRow;
+    return Array(headers.length).fill(bg);
+  });
+  sheet.getRange(2, 1, values.length, headers.length).setBackgrounds(rowBgs);
 }
 
 // ── Practice Hours ────────────────────────────────────────────────────────────
