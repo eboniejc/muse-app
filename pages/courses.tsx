@@ -3,6 +3,8 @@ import { Helmet } from "react-helmet";
 import { useTranslation } from "react-i18next";
 import { useCourses } from "../helpers/useCourses";
 import { CourseCard } from "../components/CourseCard";
+import { MembershipPassCard } from "../components/MembershipPassCard";
+import { MEMBERSHIP_PASSES } from "../helpers/membershipPasses";
 import { CourseWithDetails } from "../endpoints/courses/list_GET.schema";
 import { Input } from "../components/Input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/Select";
@@ -72,9 +74,14 @@ export default function CoursesPage() {
             </div>
           ))
         ) : filteredCourses.length > 0 ? (
-          filteredCourses.map(course => (
-            <CourseCard key={course.id} course={course} />
-          ))
+          <>
+            {filteredCourses.map(course => (
+              <CourseCard key={course.id} course={course} />
+            ))}
+            {MEMBERSHIP_PASSES.map((pass) => (
+              <MembershipPassCard key={pass.id} name={pass.name} price={pass.price} imageUrl={pass.imageUrl} />
+            ))}
+          </>
         ) : (
           <div className={styles.emptyState}>
             <p>{t('courses.noCourses')}</p>

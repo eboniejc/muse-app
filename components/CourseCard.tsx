@@ -75,7 +75,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, showEnrollment =
         ) : (
           <div className={styles.footer}>
             <div className={styles.price}>
-              {course.price ? `$${course.price}` : "Free"}
+              {course.price ? `${Number(course.price).toLocaleString("en-US")}₫` : "Free"}
             </div>
             <Button onClick={handleEnrollClick} className={styles.enrollBtn}>
               {t("courses.enroll")}

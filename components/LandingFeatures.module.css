@@ -29,6 +29,13 @@
   border-color: var(--primary);
 }
 
+.cardLink {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 .iconWrapper {
   width: 3rem;
   height: 3rem;

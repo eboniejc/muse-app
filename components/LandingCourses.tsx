@@ -5,6 +5,8 @@ import { useCourses } from "../helpers/useCourses";
 import { Button } from "./Button";
 import { Skeleton } from "./Skeleton";
 import { CourseCard } from "./CourseCard";
+import { MembershipPassCard } from "./MembershipPassCard";
+import { MEMBERSHIP_PASSES } from "../helpers/membershipPasses";
 import styles from "./LandingCourses.module.css";
 
 export const LandingCourses = () => {
@@ -31,9 +33,14 @@ export const LandingCourses = () => {
               </div>
             ))
           ) : (
-            courses?.map((course) => (
-              <CourseCard key={course.id} course={course} showEnrollment={false} />
-            ))
+            <>
+              {courses?.map((course) => (
+                <CourseCard key={course.id} course={course} showEnrollment={false} />
+              ))}
+              {MEMBERSHIP_PASSES.map((pass) => (
+                <MembershipPassCard key={pass.id} name={pass.name} price={pass.price} imageUrl={pass.imageUrl} />
+              ))}
+            </>
           )}
         </div>
       </div>

@@ -218,7 +218,7 @@ export default function CourseEnrollPage() {
               <div className={styles.priceRow}>
                 <span className={styles.priceLabel}>{t("courses.price")}</span>
                 <span className={styles.priceValue}>
-                  {course.price ? `$${Number(course.price).toLocaleString()}` : "Free"}
+                  {course.price ? `${Number(course.price).toLocaleString("en-US")}₫` : "Free"}
                 </span>
               </div>
             </div>
