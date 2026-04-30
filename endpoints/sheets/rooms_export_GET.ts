@@ -1,24 +1,23 @@
 import { supabaseAdmin } from "../../helpers/supabaseServer";
 import superjson from "superjson";
-import { format, addDays, startOfDay } from "date-fns";
+import { format } from "date-fns";
 
 export async function handle(request: Request) {
   try {
     const url = new URL(request.url);
-    const startDate = url.searchParams.get("startDate")
-      ? new Date(url.searchParams.get("startDate")!)
-      : startOfDay(new Date());
-    const endDate = url.searchParams.get("endDate")
-      ? new Date(url.searchParams.get("endDate")!)
-      : addDays(new Date(), 30);
+    const startDateParam = url.searchParams.get("startDate");
+    const endDateParam = url.searchParams.get("endDate");
 
-    const { data: bookings, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("room_bookings" as any)
       .select("id, start_time, end_time, status, notes, user_id, room_id")
       .neq("status", "cancelled")
-      .gte("start_time", startDate.toISOString())
-      .lte("start_time", endDate.toISOString())
       .order("start_time", { ascending: true });
+
+    if (startDateParam) query = query.gte("start_time", new Date(startDateParam).toISOString()) as any;
+    if (endDateParam) query = query.lte("start_time", new Date(endDateParam).toISOString()) as any;
+
+    const { data: bookings, error } = await query;
 
     if (error) throw error;
 
