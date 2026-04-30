@@ -1,13 +1,13 @@
 import { supabaseAdmin } from "../../helpers/supabaseServer";
 import superjson from "superjson";
-import { format, addDays } from "date-fns";
+import { format, addDays, startOfDay } from "date-fns";
 
 export async function handle(request: Request) {
   try {
     const url = new URL(request.url);
     const startDate = url.searchParams.get("startDate")
       ? new Date(url.searchParams.get("startDate")!)
-      : new Date();
+      : startOfDay(new Date());
     const endDate = url.searchParams.get("endDate")
       ? new Date(url.searchParams.get("endDate")!)
       : addDays(new Date(), 30);

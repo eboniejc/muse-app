@@ -13,12 +13,12 @@ export async function handle(request: Request) {
     // Get all enrolled users from both enrollment tables
     const [camelEnroll, snakeEnroll] = await Promise.all([
       supabaseAdmin.from("courseEnrollments").select("userId").eq("status", "active" as any),
-      supabaseAdmin.from("course_enrollments").select("userId:user_id").eq("status", "active" as any),
+      supabaseAdmin.from("course_enrollments").select("user_id").eq("status", "active" as any),
     ]);
 
-    const enrolledUserIds = new Set<number>([
-      ...((camelEnroll.data ?? []) as any[]).map((e: any) => Number(e.userId)),
-      ...((snakeEnroll.data ?? []) as any[]).map((e: any) => Number(e.userId)),
+    const enrolledUserIds = new Set<string>([
+      ...((camelEnroll.data ?? []) as any[]).map((e: any) => String(e.userId)).filter(Boolean),
+      ...((snakeEnroll.data ?? []) as any[]).map((e: any) => String(e.user_id)).filter(Boolean),
     ]);
 
     if (enrolledUserIds.size === 0) {
@@ -31,11 +31,11 @@ export async function handle(request: Request) {
       .select(["userId", (eb) => eb.fn.count("id").as("count")])
       .where("status", "!=", "cancelled")
       .where("startTime", ">=", periodStart)
-      .where("userId", "in", [...enrolledUserIds])
+      .where("userId" as any, "in", [...enrolledUserIds])
       .groupBy("userId")
       .execute();
 
-    const usedMap = new Map(bookingCounts.map((b: any) => [Number(b.userId), Number(b.count)]));
+    const usedMap = new Map(bookingCounts.map((b: any) => [String(b.userId), Number(b.count)]));
 
     // Get overrides
     const { data: overrides } = await supabaseAdmin
@@ -43,7 +43,7 @@ export async function handle(request: Request) {
       .select("userId, totalHours");
 
     const overrideMap = new Map(
-      ((overrides ?? []) as any[]).map((o: any) => [Number(o.userId), Number(o.totalHours)])
+      ((overrides ?? []) as any[]).map((o: any) => [String(o.userId), Number(o.totalHours)])
     );
 
     // Get user info
@@ -52,7 +52,7 @@ export async function handle(request: Request) {
       .select("id, displayname, email")
       .in("id", [...enrolledUserIds] as any[]);
 
-    const userMap = new Map((users ?? []).map((u: any) => [Number(u.id), u]));
+    const userMap = new Map((users ?? []).map((u: any) => [String(u.id), u]));
 
     const students = [...enrolledUserIds].map((userId) => {
       const user = userMap.get(userId);

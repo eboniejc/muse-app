@@ -124,12 +124,9 @@ function onOpen() {
     .createMenu('MUSE INC Sync')
     .addItem('Pull From App',              'pullFromApp')
     .addItem('Push To App',               'pushToApp')
+    .addItem('Push Hour Overrides to App', 'pushPracticeHourOverrides')
     .addItem('Sync to Google Calendar',   'syncToCalendar')
     .addItem('Fill Instructor Down',      'fillInstructorDown')
-    .addSeparator()
-    .addItem('Sync Practice Room Schedule', 'syncPracticeRooms')
-    .addItem('Sync Practice Hours',          'syncPracticeHours')
-    .addItem('Push Hour Overrides to App',   'pushPracticeHourOverrides')
     .addSeparator()
     .addSubMenu(
       SpreadsheetApp.getUi().createMenu('Settings')
@@ -212,7 +209,9 @@ function pullFromApp() {
     return;
   }
   try {
-    SpreadsheetApp.getActiveSpreadsheet().toast('Fetching data from app…', 'MUSE INC Sync', 30);
+    SpreadsheetApp.getActiveSpreadsheet().toast('Fetching data from app…', 'MUSE INC Sync', 60);
+
+    // ── Lessons + Events ──────────────────────────────────────────────────────
     var res = UrlFetchApp.fetch(appUrl + '/_api/sheets/export', {
       method: 'post',
       headers: { 'x-api-key': apiKey },
@@ -220,9 +219,9 @@ function pullFromApp() {
     });
     if (res.getResponseCode() !== 200) throw new Error('Export failed ' + res.getResponseCode() + ': ' + res.getContentText());
 
-    var parsed      = parseSuperJSON(res.getContentText());
-    var lessonRows  = (parsed && parsed.data && parsed.data.lessonRows)  || [];
-    var events      = (parsed && parsed.data && parsed.data.events)      || [];
+    var parsed        = parseSuperJSON(res.getContentText());
+    var lessonRows    = (parsed && parsed.data && parsed.data.lessonRows)  || [];
+    var events        = (parsed && parsed.data && parsed.data.events)      || [];
     var cancellations = (parsed && parsed.data && parsed.data.lessonCancellations) || [];
 
     if (lessonRows.length === 0) {
@@ -230,17 +229,41 @@ function pullFromApp() {
       if (ok !== ui.Button.YES) return;
     }
 
-    // Build instructor list for dropdown
     var instructors = _extractInstructors(lessonRows);
-
     _writeLessonsSheet(lessonRows, instructors);
     _writeEventsSheet(events);
     _ensureCalendarSheet(SpreadsheetApp.getActiveSpreadsheet());
     _ensureAuditSheet(SpreadsheetApp.getActiveSpreadsheet());
     if (cancellations.length) _writeCancellationsSheet(cancellations);
 
+    // ── Practice Room Schedule ────────────────────────────────────────────────
+    try {
+      var roomsRes = UrlFetchApp.fetch(appUrl + '/_api/sheets/rooms-export', {
+        method: 'get',
+        headers: { 'x-api-key': apiKey },
+        muteHttpExceptions: true
+      });
+      if (roomsRes.getResponseCode() === 200) {
+        var roomsParsed = parseSuperJSON(roomsRes.getContentText());
+        _writePracticeRoomsSheet((roomsParsed && roomsParsed.bookings) || []);
+      }
+    } catch(e) { Logger.log('Practice rooms sync error: ' + e.message); }
+
+    // ── Practice Hours ────────────────────────────────────────────────────────
+    try {
+      var hoursRes = UrlFetchApp.fetch(appUrl + '/_api/sheets/practice-hours-export', {
+        method: 'get',
+        headers: { 'x-api-key': apiKey },
+        muteHttpExceptions: true
+      });
+      if (hoursRes.getResponseCode() === 200) {
+        var hoursParsed = parseSuperJSON(hoursRes.getContentText());
+        _writePracticeHoursSheet((hoursParsed && hoursParsed.students) || []);
+      }
+    } catch(e) { Logger.log('Practice hours sync error: ' + e.message); }
+
     SpreadsheetApp.getActiveSpreadsheet().toast(
-      lessonRows.length + ' lesson rows, ' + events.length + ' events loaded.',
+      lessonRows.length + ' lessons, ' + events.length + ' events, rooms & hours synced.',
       'Pull complete ✓', 5);
   } catch(err) { ui.alert('Pull failed', err.message, ui.ButtonSet.OK); }
 }
