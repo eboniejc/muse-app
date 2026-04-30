@@ -3,7 +3,7 @@ import { jwtVerify, SignJWT } from "jose";
 const encoder = new TextEncoder();
 const secret = process.env.JWT_SECRET;
 
-export const SessionExpirationSeconds = 60 * 60 * 24 * 7; // 1 week
+export const SessionExpirationSeconds = 60 * 60 * 24 * 60; // 60 days
 // Probability to run cleanup (10%)
 export const CleanupProbability = 0.1;
 
@@ -77,7 +77,7 @@ export async function setServerSession(
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("1d")
+    .setExpirationTime("60d")
     .sign(encoder.encode(secret));
 
   const cookieValue = [
