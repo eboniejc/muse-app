@@ -7,6 +7,7 @@ export const useCreateRoomBooking = () => {
     mutationFn: createRoomBooking,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roomBookings"] });
+      queryClient.invalidateQueries({ queryKey: ["rooms", "hours"] });
     },
   });
 };

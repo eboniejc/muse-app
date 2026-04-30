@@ -60,10 +60,13 @@ export async function handle(request: Request) {
       );
     }
 
-    // Enforce 9am–9pm window
-    const startHour = new Date(input.startTime).getHours();
-    const endHour = new Date(input.endTime).getHours();
-    const endMinutes = new Date(input.endTime).getMinutes();
+    // Enforce 9am–9pm window in Vietnam time (UTC+7)
+    const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+    const startVN = new Date(new Date(input.startTime).getTime() + VN_OFFSET_MS);
+    const endVN = new Date(new Date(input.endTime).getTime() + VN_OFFSET_MS);
+    const startHour = startVN.getUTCHours();
+    const endHour = endVN.getUTCHours();
+    const endMinutes = endVN.getUTCMinutes();
     if (startHour < 9 || endHour > 21 || (endHour === 21 && endMinutes > 0)) {
       return new Response(
         superjson.stringify({ error: "Bookings must be between 9:00 and 21:00" }),
