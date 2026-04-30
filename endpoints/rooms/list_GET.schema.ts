@@ -7,7 +7,7 @@ export const schema = z.object({});
 
 export type Room = Pick<
   Selectable<Rooms>,
-  "id" | "name" | "description" | "roomType" | "capacity" | "equipment" | "isActive"
+  "id" | "name" | "description" | "roomType" | "capacity" | "equipment" | "isActive" | "imageUrl"
 > & {
   hourlyRate: string | null;
 };

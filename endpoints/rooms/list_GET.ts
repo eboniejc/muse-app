@@ -41,6 +41,7 @@ export async function handle(request: Request) {
             (room as any).isActive ??
             (room as any).isactive ??
             (room as any).is_active,
+          imageUrl: (room as any).imageUrl ?? (room as any).imageurl ?? (room as any).image_url ?? null,
           hourlyRate: (
             (room as any).hourlyRate ??
             (room as any).hourlyrate ??

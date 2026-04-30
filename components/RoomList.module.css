@@ -4,12 +4,26 @@
   gap: var(--spacing-3);
 }
 
+.image {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin-bottom: 0;
+}
+
+.body {
+  padding: var(--spacing-4);
+  width: 100%;
+}
+
 .card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   width: 100%;
-  padding: var(--spacing-4);
+  padding: 0;
+  overflow: hidden;
   background-color: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);

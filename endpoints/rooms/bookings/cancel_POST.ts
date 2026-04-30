@@ -24,7 +24,7 @@ export async function handle(request: Request) {
     }
 
     // Only allow cancellation if user owns the booking or is an admin
-    if (booking.userId !== user.id && user.role !== "admin") {
+    if (String(booking.userId) !== String(user.id) && user.role !== "admin") {
       return new Response(
         superjson.stringify({ error: "Not authorized to cancel this booking" }),
         { status: 403 }

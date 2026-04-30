@@ -128,6 +128,7 @@ export interface Rooms {
   equipment: string[] | null;
   hourlyRate: Generated<Numeric | null>;
   id: Generated<number>;
+  imageUrl: string | null;
   isActive: Generated<boolean | null>;
   name: string;
   roomType: Generated<RoomType>;

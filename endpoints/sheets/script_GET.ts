@@ -15,8 +15,21 @@ var LESSONS_SHEET   = 'Lessons';
 var EVENTS_SHEET    = 'Events';
 var CAL_SHEET       = 'Monthly Calendar';
 var AUDIT_SHEET     = 'Audit';
+var ROOMS_SHEET     = 'Practice Room Schedule';
+var HOURS_SHEET     = 'Practice Hours';
 var CALENDAR_NAME   = 'MUSE INC Schedule';
 var LESSON_DURATION = 1; // hours
+
+// Columns in Practice Hours sheet (1-indexed)
+var PH_COL_NAME      = 1;
+var PH_COL_EMAIL     = 2;
+var PH_COL_USED      = 3;
+var PH_COL_REMAINING = 4;
+var PH_COL_TOTAL     = 5;
+var PH_COL_OVERRIDE  = 6;
+var PH_COL_PERIOD    = 7;
+var PH_COL_USERID    = 8;
+var PH_COL_COUNT     = 8;
 
 var TIME_SLOTS = (function() {
   var slots = [];
@@ -99,6 +112,8 @@ function setupSheets() {
   _ensureEventsSheet(ss);
   _ensureCalendarSheet(ss);
   _ensureAuditSheet(ss);
+  _ensurePracticeRoomsSheet(ss);
+  _ensurePracticeHoursSheet(ss);
   Logger.log('Sheets ready.');
 }
 
@@ -111,6 +126,10 @@ function onOpen() {
     .addItem('Push To App',               'pushToApp')
     .addItem('Sync to Google Calendar',   'syncToCalendar')
     .addItem('Fill Instructor Down',      'fillInstructorDown')
+    .addSeparator()
+    .addItem('Sync Practice Room Schedule', 'syncPracticeRooms')
+    .addItem('Sync Practice Hours',          'syncPracticeHours')
+    .addItem('Push Hour Overrides to App',   'pushPracticeHourOverrides')
     .addSeparator()
     .addSubMenu(
       SpreadsheetApp.getUi().createMenu('Settings')
@@ -946,6 +965,178 @@ function makeCancelLink(appUrl, apiKey, enrollmentId, lessonNumber) {
   var hmac = Utilities.computeHmacSha256Signature(Utilities.newBlob(msg).getBytes(), Utilities.newBlob(apiKey).getBytes());
   var sig  = hmac.map(function(b) { return ('0'+(b<0?b+256:b).toString(16)).slice(-2); }).join('');
   return appUrl + '/_api/lessons/cancel?e=' + enrollmentId + '&l=' + lessonNumber + '&sig=' + sig;
+}
+
+// ── Practice Room Schedule ────────────────────────────────────────────────────
+
+function syncPracticeRooms() {
+  var ui    = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var appUrl = props.getProperty('APP_URL');
+  var apiKey = props.getProperty('API_KEY');
+  if (!appUrl || !apiKey) {
+    ui.alert('Not configured', 'Run MUSE INC Sync > Settings > Setup App Connection first.', ui.ButtonSet.OK);
+    return;
+  }
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast('Fetching room bookings\\u2026', 'MUSE INC Sync', 30);
+    var res = UrlFetchApp.fetch(appUrl + '/_api/sheets/rooms-export', {
+      method: 'get',
+      headers: { 'x-api-key': apiKey },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) throw new Error('Rooms export failed ' + res.getResponseCode() + ': ' + res.getContentText());
+    var parsed   = parseSuperJSON(res.getContentText());
+    var bookings = (parsed && parsed.bookings) || [];
+    _writePracticeRoomsSheet(bookings);
+    SpreadsheetApp.getActiveSpreadsheet().toast(bookings.length + ' bookings synced.', 'Practice Room Schedule \\u2713', 5);
+  } catch(err) { ui.alert('Sync failed', err.message, ui.ButtonSet.OK); }
+}
+
+function _ensurePracticeRoomsSheet(ss) {
+  var sheet = ss.getSheetByName(ROOMS_SHEET);
+  if (!sheet) sheet = ss.insertSheet(ROOMS_SHEET);
+  return sheet;
+}
+
+function _writePracticeRoomsSheet(bookings) {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(ROOMS_SHEET) || ss.insertSheet(ROOMS_SHEET);
+  sheet.clearContents();
+  sheet.clearFormats();
+  var headers = ['Date', 'Start Time', 'End Time', 'Room', 'Student', 'Email', 'Status'];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setBackground(C.navy).setFontColor(C.white).setFontWeight('bold');
+  sheet.setFrozenRows(1);
+  if (!bookings.length) return;
+  var values = bookings.map(function(b) {
+    return [b.date || '', b.startTime || '', b.endTime || '', b.roomName || '', b.studentName || '', b.studentEmail || '', b.status || ''];
+  });
+  sheet.getRange(2, 1, values.length, headers.length).setValues(values);
+  for (var i = 0; i < values.length; i++) {
+    sheet.getRange(i + 2, 1, 1, headers.length).setBackground(i % 2 === 0 ? C.white : C.altRow);
+  }
+  sheet.autoResizeColumns(1, headers.length);
+}
+
+// ── Practice Hours ────────────────────────────────────────────────────────────
+
+function syncPracticeHours() {
+  var ui    = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var appUrl = props.getProperty('APP_URL');
+  var apiKey = props.getProperty('API_KEY');
+  if (!appUrl || !apiKey) {
+    ui.alert('Not configured', 'Run MUSE INC Sync > Settings > Setup App Connection first.', ui.ButtonSet.OK);
+    return;
+  }
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast('Fetching practice hours\\u2026', 'MUSE INC Sync', 30);
+    var res = UrlFetchApp.fetch(appUrl + '/_api/sheets/practice-hours-export', {
+      method: 'get',
+      headers: { 'x-api-key': apiKey },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) throw new Error('Hours export failed ' + res.getResponseCode() + ': ' + res.getContentText());
+    var parsed   = parseSuperJSON(res.getContentText());
+    var students = (parsed && parsed.students) || [];
+    _writePracticeHoursSheet(students);
+    SpreadsheetApp.getActiveSpreadsheet().toast(students.length + ' students synced.', 'Practice Hours \\u2713', 5);
+  } catch(err) { ui.alert('Sync failed', err.message, ui.ButtonSet.OK); }
+}
+
+function pushPracticeHourOverrides() {
+  var ui    = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var appUrl = props.getProperty('APP_URL');
+  var apiKey = props.getProperty('API_KEY');
+  if (!appUrl || !apiKey) {
+    ui.alert('Not configured', 'Run MUSE INC Sync > Settings > Setup App Connection first.', ui.ButtonSet.OK);
+    return;
+  }
+  try {
+    var rows = _readPracticeHoursSheet();
+    if (!rows.length) { ui.alert('No data', 'Run Sync Practice Hours first.', ui.ButtonSet.OK); return; }
+    var confirm = ui.alert('Confirm Push', 'Push hour overrides for ' + rows.length + ' students?', ui.ButtonSet.YES_NO);
+    if (confirm !== ui.Button.YES) return;
+    SpreadsheetApp.getActiveSpreadsheet().toast('Pushing overrides\\u2026', 'MUSE INC Sync', 30);
+    var r = UrlFetchApp.fetch(appUrl + '/_api/sheets/import', {
+      method: 'post',
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      payload: JSON.stringify({ json: { table: 'practiceHours', rows: rows } }),
+      muteHttpExceptions: true
+    });
+    if (r.getResponseCode() !== 200) throw new Error('Push failed: ' + r.getContentText());
+    var result = parseSuperJSON(r.getContentText());
+    ui.alert('Done', 'Overrides updated for ' + (result.count || rows.length) + ' students.', ui.ButtonSet.OK);
+  } catch(err) { ui.alert('Push failed', err.message, ui.ButtonSet.OK); }
+}
+
+function _ensurePracticeHoursSheet(ss) {
+  var sheet = ss.getSheetByName(HOURS_SHEET);
+  if (!sheet) sheet = ss.insertSheet(HOURS_SHEET);
+  return sheet;
+}
+
+function _writePracticeHoursSheet(students) {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(HOURS_SHEET) || ss.insertSheet(HOURS_SHEET);
+  sheet.clearContents();
+  sheet.clearFormats();
+  sheet.setConditionalFormatRules([]);
+  var headers = ['Student Name', 'Email', 'Hours Used', 'Hours Remaining', 'Total Allotted', 'Override Total', 'Period Start', 'User ID'];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setBackground(C.navy).setFontColor(C.white).setFontWeight('bold');
+  sheet.setFrozenRows(1);
+  sheet.hideColumns(PH_COL_USERID);
+  if (!students.length) return;
+  var values = students.map(function(s) {
+    return [
+      s.studentName || '',
+      s.email || '',
+      s.hoursUsed || 0,
+      s.hoursRemaining || 0,
+      s.effectiveTotal || 30,
+      (s.overrideTotal !== null && s.overrideTotal !== undefined) ? s.overrideTotal : '',
+      s.periodStart || '',
+      s.userId || '',
+    ];
+  });
+  sheet.getRange(2, 1, values.length, headers.length).setValues(values);
+  // Read-only columns
+  [PH_COL_NAME, PH_COL_EMAIL, PH_COL_USED, PH_COL_REMAINING, PH_COL_TOTAL, PH_COL_PERIOD, PH_COL_USERID].forEach(function(col) {
+    sheet.getRange(2, col, values.length, 1).setBackground(C.readonly);
+  });
+  // Override Total is editable
+  sheet.getRange(2, PH_COL_OVERRIDE, values.length, 1).setBackground(C.inputBg);
+  // Conditional formatting on Hours Remaining
+  var remRange = sheet.getRange(2, PH_COL_REMAINING, values.length, 1);
+  var rules = [];
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenNumberEqualTo(0)
+    .setBackground('#fde8e8').setFontColor('#cc0000')
+    .setRanges([remRange]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenNumberLessThanOrEqualTo(5)
+    .setBackground('#fff7e0').setFontColor('#856404')
+    .setRanges([remRange]).build());
+  sheet.setConditionalFormatRules(rules);
+  sheet.autoResizeColumns(1, 7);
+}
+
+function _readPracticeHoursSheet() {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(HOURS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, PH_COL_COUNT).getValues();
+  var rows = [];
+  data.forEach(function(r) {
+    var userId = r[PH_COL_USERID - 1];
+    if (!userId) return;
+    var ov = r[PH_COL_OVERRIDE - 1];
+    rows.push({ userId: userId, overrideTotal: (ov !== '' && ov !== null && ov !== undefined) ? ov : null });
+  });
+  return rows;
 }
 `;
 

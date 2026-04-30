@@ -76,34 +76,6 @@ export async function handle(request: Request) {
       );
     }
 
-    if (course.maxStudents) {
-      let count = 0;
-      try {
-        const currentEnrollments = await db
-          .selectFrom("courseEnrollments")
-          .select((eb) => eb.fn.count("id").as("count"))
-          .where("courseId", "=", courseId)
-          .where("status", "=", "active")
-          .executeTakeFirst();
-        count = Number(currentEnrollments?.count ?? 0);
-      } catch (error) {
-        if (!isSchemaOrMissingTableError(error)) throw error;
-      }
-      if (!count) {
-        const [camel, snake] = await Promise.all([
-          supabaseAdmin.from("courseEnrollments").select("id", { count: "exact", head: true }).eq("courseId", courseId).eq("status", "active"),
-          supabaseAdmin.from("course_enrollments").select("id", { count: "exact", head: true }).eq("courseId", courseId).eq("status", "active"),
-        ]);
-        count = Number(camel.count ?? 0) + Number(snake.count ?? 0);
-      }
-
-      if (count >= course.maxStudents) {
-        return new Response(
-          superjson.stringify({ error: "Course is full" }),
-          { status: 400 }
-        );
-      }
-    }
 
     let inserted: any;
     try {

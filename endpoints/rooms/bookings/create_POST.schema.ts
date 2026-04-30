@@ -4,10 +4,11 @@ import { Selectable } from "kysely";
 import { RoomBookings } from "../../../helpers/schema";
 
 export const schema = z.object({
-  roomId: z.number(),
+  roomId: z.coerce.number(),
   startTime: z.date(),
   endTime: z.date(),
   notes: z.string().optional(),
+  targetUserId: z.coerce.number().optional(),
 });
 
 export type OutputType = {

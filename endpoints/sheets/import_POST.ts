@@ -305,6 +305,8 @@ export async function handle(request: Request) {
       processedCount = await handleLessonSchedulesImport(rows);
     } else if (table === "events") {
       processedCount = await handleEventsImport(rows);
+    } else if (table === "practiceHours") {
+      processedCount = await handlePracticeHoursImport(rows);
     } else {
       for (const rawRow of rows) {
         const row = pickAllowed(table, rawRow as Record<string, any>);
@@ -806,6 +808,35 @@ async function handleLessonSchedulesImport(rows: any[]) {
     count++;
   }
 
+  return count;
+}
+
+async function handlePracticeHoursImport(rows: any[]) {
+  let count = 0;
+  for (const raw of rows as Array<Record<string, any>>) {
+    const userId = Number(raw.userId ?? raw.user_id ?? 0);
+    if (!userId) continue;
+
+    const overrideRaw = raw.overrideTotal ?? raw.override_total ?? raw["Override Total"];
+    const overrideNum =
+      overrideRaw !== null && overrideRaw !== undefined && overrideRaw !== ""
+        ? Number(overrideRaw)
+        : null;
+
+    if (overrideNum !== null && Number.isFinite(overrideNum) && overrideNum > 0) {
+      const { error } = await supabaseAdmin
+        .from("practiceHoursOverrides" as any)
+        .upsert({ userId, totalHours: Math.floor(overrideNum) }, { onConflict: "userId" });
+      if (error) throw error;
+    } else {
+      // Blank or 0 → remove override, revert to default
+      await supabaseAdmin
+        .from("practiceHoursOverrides" as any)
+        .delete()
+        .eq("userId", userId as any);
+    }
+    count++;
+  }
   return count;
 }
 

@@ -17,6 +17,7 @@ export const schema = z.object({
     "userProfiles",
     "flattenedEnrollments",
     "lessonRows",
+    "practiceHours",
   ]),
   rows: z.array(z.record(z.any())),
 });
