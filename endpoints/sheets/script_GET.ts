@@ -155,10 +155,10 @@ function _handleEdit(e) {
     return;
   }
 
-  if (name === CAL_SHEET && row === 1 && (col === 2 || col === 4)) {
+  if (name === CAL_SHEET && row <= 2 && (col === 2 || col === 4)) {
     renderCalendar(sheet); return;
   }
-  if (name === AUDIT_SHEET && row === 1 && (col === 2 || col === 4)) {
+  if (name === AUDIT_SHEET && row <= 2 && (col === 2 || col === 4)) {
     renderAudit(sheet); return;
   }
 }
@@ -331,7 +331,7 @@ function syncToCalendar() {
   if (!calendar) { ui.alert('Calendar not found', 'Run Setup Google Calendar again.', ui.ButtonSet.OK); return; }
 
   var rows = _readLessonsSheet();
-  var created = 0, updated = 0;
+  var created = 0, updated = 0, apiCalls = 0;
 
   // Pre-fetch all muse-tagged events once so date changes are found regardless of old date
   var scanFrom = new Date(); scanFrom.setFullYear(scanFrom.getFullYear() - 2);
@@ -369,6 +369,7 @@ function syncToCalendar() {
 
     var guests = [row.email, 'museincproperty@gmail.com'].filter(Boolean);
 
+    if (apiCalls > 0 && apiCalls % 10 === 0) Utilities.sleep(1000);
     var existingEv = tagMap[tag];
     if (existingEv) {
       existingEv.setTitle(title); existingEv.setTime(start, end); existingEv.setDescription(lines.join('\\n'));
@@ -381,6 +382,7 @@ function syncToCalendar() {
       calendar.createEvent(title, start, end, opts);
       created++;
     }
+    apiCalls++;
   });
 
   // ── Delete orphaned events (events with [muse:N:N] tags no longer in sheet) ──
@@ -405,7 +407,7 @@ function syncToCalendar() {
       : 'This will delete ' + toDelete.length + ' orphaned event(s) no longer in the sheet.\\n\\nContinue?';
     var go = ui.alert('Confirm deletions', confirmMsg, ui.ButtonSet.YES_NO);
     if (go === ui.Button.YES) {
-      toDelete.forEach(function(ev) { ev.deleteEvent(); deleted++; });
+      toDelete.forEach(function(ev, i) { if (i > 0 && i % 10 === 0) Utilities.sleep(1000); ev.deleteEvent(); deleted++; });
     }
   }
 
@@ -852,11 +854,18 @@ function _buildCalendarControls(sheet) {
 function renderCalendar(sheet) {
   var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var monthVal = sheet.getRange('B1').getValue();
-  var yearVal  = sheet.getRange('D1').getValue();
+  // Auto-detect which row holds the controls (scan rows 1-3)
+  var ctrlRow = 1;
+  for (var r = 1; r <= 3; r++) {
+    if (MONTHS.indexOf(String(sheet.getRange(r, 2).getValue()).trim()) !== -1) { ctrlRow = r; break; }
+  }
+  var monthVal = sheet.getRange(ctrlRow, 2).getValue();
+  var yearVal  = sheet.getRange(ctrlRow, 4).getValue();
   var month    = MONTHS.indexOf(String(monthVal).trim()) + 1;
   var year     = parseInt(yearVal, 10);
   if (!month || !year || year < 2000 || year > 2100) return;
+  var headerRow  = ctrlRow + 1;
+  var gridStart  = ctrlRow + 2;
 
   var lessonsByDay = {};
   try {
@@ -902,17 +911,17 @@ function renderCalendar(sheet) {
   while (week.length && week.length < 7) week.push(0);
   if (week.length) weeks.push(week);
 
-  var lastRow = Math.max(sheet.getLastRow(), 12);
-  if (lastRow >= 3) sheet.getRange(3, 1, lastRow - 2, 7).clearContent().clearFormat();
+  var lastRow = Math.max(sheet.getLastRow(), gridStart + 5);
+  if (lastRow >= gridStart) sheet.getRange(gridStart, 1, lastRow - gridStart + 1, 7).clearContent().clearFormat();
 
   DAYS.forEach(function(name, col) {
-    sheet.getRange(2, col + 1).setValue(name)
+    sheet.getRange(headerRow, col + 1).setValue(name)
       .setBackground(C.navyMid).setFontColor(C.white).setFontWeight('bold')
       .setHorizontalAlignment('center');
   });
 
   weeks.forEach(function(wk, wkIdx) {
-    var sheetRow = wkIdx + 3;
+    var sheetRow = wkIdx + gridStart;
     var maxL = 0;
     wk.forEach(function(day) { if (day && lessonsByDay[String(day)]) maxL = Math.max(maxL, lessonsByDay[String(day)].length); });
     sheet.setRowHeight(sheetRow, Math.max(72, 36 + maxL * 22));
@@ -963,8 +972,14 @@ function _buildAuditControls(sheet) {
 }
 
 function renderAudit(sheet) {
-  var fromVal = sheet.getRange('B1').getValue();
-  var toVal   = sheet.getRange('D1').getValue();
+  // Auto-detect which row holds the controls (scan rows 1-3 for a Date value in col B)
+  var ctrlRow = 1;
+  for (var r = 1; r <= 3; r++) {
+    if (sheet.getRange(r, 2).getValue() instanceof Date) { ctrlRow = r; break; }
+  }
+  var fromVal = sheet.getRange(ctrlRow, 2).getValue();
+  var toVal   = sheet.getRange(ctrlRow, 4).getValue();
+  var gridStart = ctrlRow + 2;
   if (!fromVal || !toVal) return;
   var fromDate = new Date(fromVal);
   var toDate   = new Date(toVal);
@@ -999,12 +1014,12 @@ function renderAudit(sheet) {
     }
   } catch(e) { Logger.log('renderAudit error: ' + e.message); return; }
 
-  var lastRow = Math.max(sheet.getLastRow(), 10);
-  if (lastRow >= 3) sheet.getRange(3, 1, lastRow - 2, 5).clearContent().clearFormat();
+  var lastRow = Math.max(sheet.getLastRow(), gridStart + 5);
+  if (lastRow >= gridStart) sheet.getRange(gridStart, 1, lastRow - gridStart + 1, 5).clearContent().clearFormat();
 
   var instructors = Object.keys(byInstructor).sort();
   var total = instructors.reduce(function(s,n) { return s + byInstructor[n].length; }, 0);
-  var r = 3;
+  var r = gridStart;
 
   if (!instructors.length) {
     sheet.getRange(r,1,1,5).merge().setValue('No lessons found for this date range.')
