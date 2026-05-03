@@ -236,6 +236,8 @@ function pullFromApp() {
     _writeEventsSheet(events);
     _ensureCalendarSheet(SpreadsheetApp.getActiveSpreadsheet());
     _ensureAuditSheet(SpreadsheetApp.getActiveSpreadsheet());
+    renderCalendar(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CAL_SHEET));
+    renderAudit(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(AUDIT_SHEET));
     if (cancellations.length) _writeCancellationsSheet(cancellations);
 
     // ── Practice Room Schedule ────────────────────────────────────────────────
@@ -338,7 +340,7 @@ function syncToCalendar() {
   var tagMap = {};
   allEvents.forEach(function(ev) {
     var desc = ev.getDescription() || '';
-    var match = desc.match(/\[muse:\d+:\d+\]/);
+    var match = desc.match(/\\[muse:\\d+:\\d+\\]/);
     if (match) tagMap[match[0]] = ev;
   });
 
@@ -392,7 +394,7 @@ function syncToCalendar() {
   var toDelete = [];
   allEvents.forEach(function(ev) {
     var desc = ev.getDescription() || '';
-    var match = desc.match(/\[muse:\d+:\d+\]/);
+    var match = desc.match(/\\[muse:\\d+:\\d+\\]/);
     if (match && !currentTags[match[0]]) toDelete.push(ev);
   });
 
@@ -424,7 +426,7 @@ function syncEventsToCalendar() {
   var tagMap = {};
   allEvents.forEach(function(ev) {
     var desc = ev.getDescription() || '';
-    var match = desc.match(/\[muse_event:[^\]]+\]/);
+    var match = desc.match(/\\[muse_event:[^\\]]+\\]/);
     if (match) tagMap[match[0]] = ev;
   });
 
@@ -445,7 +447,7 @@ function syncEventsToCalendar() {
   // Delete orphaned event entries no longer in the Events sheet
   allEvents.forEach(function(ev) {
     var desc = ev.getDescription() || '';
-    var match = desc.match(/\[muse_event:[^\]]+\]/);
+    var match = desc.match(/\\[muse_event:[^\\]]+\\]/);
     if (match && !currentTags[match[0]]) ev.deleteEvent();
   });
 }
