@@ -16,7 +16,7 @@ export default function InstructorsPage() {
     {
       id: -1,
       displayName: "DJ Phatbeatz",
-      email: "",
+      email: "Info.djphat@gmail.com",
       avatarUrl: null,
       whatsappNumber: "+84902957911",
       whatsappLink: "https://wa.me/84902957911",

@@ -78,6 +78,7 @@ var STATIC_INSTRUCTORS = [
   'dj.jakeryan95@gmail.com',
   'djnapple@gmail.com',
   'thienga1110@gmail.com',
+  'Info.djphat@gmail.com',
 ];
 
 // Columns in the Lessons sheet (1-indexed)
