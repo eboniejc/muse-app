@@ -1,4 +1,3 @@
-import { schema } from "./script_GET.schema";
 
 const GOOGLE_APPS_SCRIPT_CONTENT = `
 // ── MUSE INC Google Sheets Manager ───────────────────────────────────────────
@@ -373,8 +372,29 @@ function syncToCalendar() {
     }
   });
 
+  // ── Delete orphaned events (events with [muse:N:N] tags no longer in sheet) ──
+  var currentTags = {};
+  rows.forEach(function(row) {
+    if (row.scheduledAt) {
+      currentTags['[muse:' + row.enrollmentId + ':' + row.lessonNumber + ']'] = true;
+    }
+  });
+
+  var scanFrom = new Date(); scanFrom.setFullYear(scanFrom.getFullYear() - 2);
+  var scanTo   = new Date(); scanTo.setFullYear(scanTo.getFullYear() + 2);
+  var allEvents = calendar.getEvents(scanFrom, scanTo);
+  var deleted = 0;
+  allEvents.forEach(function(ev) {
+    var desc = ev.getDescription() || '';
+    var match = desc.match(/\[muse:\d+:\d+\]/);
+    if (match && !currentTags[match[0]]) {
+      ev.deleteEvent();
+      deleted++;
+    }
+  });
+
   ui.alert('Calendar sync complete',
-    'Created ' + created + ' | Updated ' + updated,
+    'Created ' + created + ' | Updated ' + updated + ' | Deleted ' + deleted,
     ui.ButtonSet.OK);
 }
 
@@ -601,6 +621,9 @@ function _readLessonsSheet() {
       lessonNumber: lessonNumber,
       scheduledAt:  scheduledAt,
       instructor:   String(r[COL_INSTRUCTOR - 1] || ''),
+      studentName:  String(r[COL_STUDENT_NAME - 1] || ''),
+      courseName:   String(r[COL_COURSE_NAME - 1] || ''),
+      email:        String(r[COL_EMAIL - 1] || ''),
     });
   });
 

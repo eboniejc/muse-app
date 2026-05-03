@@ -34,12 +34,13 @@ export async function handle(request: Request) {
       if (!isSchemaOrMissingTableError(error)) throw error;
       const { data, error: restErr } = await supabaseAdmin
         .from("courses")
-        .select("id,isActive,maxStudents")
+        .select("id, is_active, max_students")
         .eq("id", courseId)
         .limit(1)
         .maybeSingle();
       if (restErr) throw restErr;
-      course = data;
+      // normalise snake_case Supabase columns to camelCase
+      course = data ? { ...data, isActive: (data as any).is_active } : data;
     }
 
     if (!course || !course.isActive) {
@@ -64,7 +65,7 @@ export async function handle(request: Request) {
     if (!existingEnrollment) {
       const [camel, snake] = await Promise.all([
         supabaseAdmin.from("courseEnrollments").select("id").eq("userId", user.id as any).eq("courseId", courseId).in("status", ["active", "paused"]).limit(1).maybeSingle(),
-        supabaseAdmin.from("course_enrollments").select("id").eq("userId", user.id as any).eq("courseId", courseId).in("status", ["active", "paused"]).limit(1).maybeSingle(),
+        supabaseAdmin.from("course_enrollments").select("id").eq("user_id", user.id as any).eq("course_id", courseId).in("status", ["active", "paused"]).limit(1).maybeSingle(),
       ]);
       existingEnrollment = camel.data ?? snake.data ?? null;
     }
