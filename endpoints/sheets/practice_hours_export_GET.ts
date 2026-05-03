@@ -3,6 +3,11 @@ import { db } from "../../helpers/db";
 import superjson from "superjson";
 import { subDays, format } from "date-fns";
 
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+function toVnDate(date: Date): Date {
+  return new Date(date.getTime() + VN_OFFSET_MS);
+}
+
 const PRACTICE_HOURS_LIMIT = 30;
 const PERIOD_DAYS = 42;
 
@@ -67,7 +72,7 @@ export async function handle(request: Request) {
         hoursRemaining: Math.max(0, effectiveTotal - hoursUsed),
         effectiveTotal,
         overrideTotal,
-        periodStart: format(periodStart, "yyyy-MM-dd"),
+        periodStart: format(toVnDate(periodStart), "yyyy-MM-dd"),
       };
     });
 

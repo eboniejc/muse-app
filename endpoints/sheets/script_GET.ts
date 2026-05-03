@@ -18,6 +18,7 @@ var ROOMS_SHEET     = 'Practice Room Schedule';
 var HOURS_SHEET     = 'Practice Hours';
 var CALENDAR_NAME   = 'MUSE INC Schedule';
 var LESSON_DURATION = 1; // hours
+var VN_TZ           = 'Asia/Ho_Chi_Minh';
 
 // Columns in Practice Hours sheet (1-indexed)
 var PH_COL_NAME      = 1;
@@ -154,10 +155,10 @@ function _handleEdit(e) {
     return;
   }
 
-  if (name === CAL_SHEET && row === 2 && (col === 2 || col === 4)) {
+  if (name === CAL_SHEET && row === 1 && (col === 2 || col === 4)) {
     renderCalendar(sheet); return;
   }
-  if (name === AUDIT_SHEET && row === 2 && (col === 2 || col === 4)) {
+  if (name === AUDIT_SHEET && row === 1 && (col === 2 || col === 4)) {
     renderAudit(sheet); return;
   }
 }
@@ -330,6 +331,17 @@ function syncToCalendar() {
   var rows = _readLessonsSheet();
   var created = 0, updated = 0;
 
+  // Pre-fetch all muse-tagged events once so date changes are found regardless of old date
+  var scanFrom = new Date(); scanFrom.setFullYear(scanFrom.getFullYear() - 2);
+  var scanTo   = new Date(); scanTo.setFullYear(scanTo.getFullYear() + 2);
+  var allEvents = calendar.getEvents(scanFrom, scanTo);
+  var tagMap = {};
+  allEvents.forEach(function(ev) {
+    var desc = ev.getDescription() || '';
+    var match = desc.match(/\[muse:\d+:\d+\]/);
+    if (match) tagMap[match[0]] = ev;
+  });
+
   rows.forEach(function(row) {
     if (!row.scheduledAt) return;
     var start = new Date(row.scheduledAt);
@@ -338,6 +350,8 @@ function syncToCalendar() {
 
     var eId   = row.enrollmentId;
     var lessonNum = row.lessonNumber;
+    // Skip contest rows — their lesson numbers are strings like "Contest 1"
+    if (!/^\\d+$/.test(String(lessonNum))) return;
     var tag   = '[muse:' + eId + ':' + lessonNum + ']';
     var title = (row.courseName || 'Lesson') + ' - Lesson ' + lessonNum + ' | ' + (row.studentName || '');
 
@@ -353,17 +367,11 @@ function syncToCalendar() {
 
     var guests = [row.email, 'museincproperty@gmail.com'].filter(Boolean);
 
-    var ds = new Date(start); ds.setHours(0,0,0,0);
-    var de = new Date(start); de.setHours(23,59,59,999);
-    var existing = calendar.getEvents(ds, de).filter(function(ev) {
-      return ev.getDescription().indexOf(tag) !== -1;
-    });
-
-    if (existing.length) {
-      var ev = existing[0];
-      ev.setTitle(title); ev.setTime(start, end); ev.setDescription(lines.join('\\n'));
-      var ge = ev.getGuestList().map(function(g) { return g.getEmail(); });
-      guests.forEach(function(em) { if (ge.indexOf(em) === -1) ev.addGuest(em); });
+    var existingEv = tagMap[tag];
+    if (existingEv) {
+      existingEv.setTitle(title); existingEv.setTime(start, end); existingEv.setDescription(lines.join('\\n'));
+      var ge = existingEv.getGuestList().map(function(g) { return g.getEmail(); });
+      guests.forEach(function(em) { if (ge.indexOf(em) === -1) existingEv.addGuest(em); });
       updated++;
     } else {
       var opts = { description: lines.join('\\n') };
@@ -376,23 +384,28 @@ function syncToCalendar() {
   // ── Delete orphaned events (events with [muse:N:N] tags no longer in sheet) ──
   var currentTags = {};
   rows.forEach(function(row) {
-    if (row.scheduledAt) {
+    if (row.scheduledAt && /^\\d+$/.test(String(row.lessonNumber))) {
       currentTags['[muse:' + row.enrollmentId + ':' + row.lessonNumber + ']'] = true;
     }
   });
 
-  var scanFrom = new Date(); scanFrom.setFullYear(scanFrom.getFullYear() - 2);
-  var scanTo   = new Date(); scanTo.setFullYear(scanTo.getFullYear() + 2);
-  var allEvents = calendar.getEvents(scanFrom, scanTo);
-  var deleted = 0;
+  var toDelete = [];
   allEvents.forEach(function(ev) {
     var desc = ev.getDescription() || '';
     var match = desc.match(/\[muse:\d+:\d+\]/);
-    if (match && !currentTags[match[0]]) {
-      ev.deleteEvent();
-      deleted++;
-    }
+    if (match && !currentTags[match[0]]) toDelete.push(ev);
   });
+
+  var deleted = 0;
+  if (toDelete.length > 0) {
+    var confirmMsg = rows.length === 0
+      ? 'WARNING: The Lessons sheet is empty.\\nThis will delete ALL ' + toDelete.length + ' calendar event(s).\\n\\nAre you sure?'
+      : 'This will delete ' + toDelete.length + ' orphaned event(s) no longer in the sheet.\\n\\nContinue?';
+    var go = ui.alert('Confirm deletions', confirmMsg, ui.ButtonSet.YES_NO);
+    if (go === ui.Button.YES) {
+      toDelete.forEach(function(ev) { ev.deleteEvent(); deleted++; });
+    }
+  }
 
   ui.alert('Calendar sync complete',
     'Created ' + created + ' | Updated ' + updated + ' | Deleted ' + deleted,
@@ -403,18 +416,37 @@ function syncEventsToCalendar() {
   var props = PropertiesService.getScriptProperties();
   var calId = props.getProperty('CALENDAR_ID'); if (!calId) return;
   var calendar = CalendarApp.getCalendarById(calId); if (!calendar) return;
+
+  // Pre-fetch all muse_event-tagged events once so date changes are found regardless of old date
+  var scanFrom = new Date(); scanFrom.setFullYear(scanFrom.getFullYear() - 2);
+  var scanTo   = new Date(); scanTo.setFullYear(scanTo.getFullYear() + 2);
+  var allEvents = calendar.getEvents(scanFrom, scanTo);
+  var tagMap = {};
+  allEvents.forEach(function(ev) {
+    var desc = ev.getDescription() || '';
+    var match = desc.match(/\[muse_event:[^\]]+\]/);
+    if (match) tagMap[match[0]] = ev;
+  });
+
+  var currentTags = {};
   _readEventsSheet().forEach(function(row) {
     if (!row.title || !row.startAt) return;
     var start = new Date(row.startAt); if (isNaN(start.getTime())) return;
     var end = row.endAt ? new Date(row.endAt) : new Date(start.getTime() + 7200000);
     var tag = '[muse_event:' + row.id + ']';
     var desc = (row.caption || '') + '\\n' + tag;
-    var ds = new Date(start); ds.setHours(0,0,0,0);
-    var de = new Date(start); de.setHours(23,59,59,999);
-    var ex = calendar.getEvents(ds, de).filter(function(ev) { return ev.getDescription().indexOf(tag) !== -1; });
     var guests = 'museincproperty@gmail.com';
-    if (ex.length) { ex[0].setTitle(row.title); ex[0].setTime(start, end); ex[0].setDescription(desc); ex[0].addGuest(guests); }
+    var ex = tagMap[tag];
+    if (ex) { ex.setTitle(row.title); ex.setTime(start, end); ex.setDescription(desc); ex.addGuest(guests); }
     else calendar.createEvent(row.title, start, end, { description: desc, guests: guests });
+    currentTags[tag] = true;
+  });
+
+  // Delete orphaned event entries no longer in the Events sheet
+  allEvents.forEach(function(ev) {
+    var desc = ev.getDescription() || '';
+    var match = desc.match(/\[muse_event:[^\]]+\]/);
+    if (match && !currentTags[match[0]]) ev.deleteEvent();
   });
 }
 
@@ -475,7 +507,7 @@ function _formatLessonsHeader(sheet) {
 function _writeLessonsSheet(lessonRows, instructors) {
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(LESSONS_SHEET) || ss.insertSheet(LESSONS_SHEET);
-  var tz    = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  var tz    = VN_TZ;
 
   // Preserve existing instructor overrides keyed by enrollmentId+lessonNumber
   var existingInstrs = {};
@@ -566,7 +598,7 @@ function _readLessonsSheet() {
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(LESSONS_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  var tz   = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  var tz   = VN_TZ;
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, LESSONS_COL_COUNT).getValues();
   var rows = [];
 
@@ -740,7 +772,7 @@ function _readEventsSheet() {
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(EVENTS_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  var tz      = ss.getSpreadsheetTimeZone() || Session.getScriptTimeZone();
+  var tz      = VN_TZ;
   var headers = ['id','title','caption','flyerUrl','startAt','endAt','isActive'];
   var data    = sheet.getRange(2, 1, sheet.getLastRow() - 1, 7).getValues();
   var rows    = [];
@@ -764,18 +796,28 @@ function _writeCancellationsSheet(cancellations) {
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Cancellations') || ss.insertSheet('Cancellations');
   var headers = ['enrollmentId','lessonNumber','studentName','studentEmail','courseName','scheduledAt','cancelledAt','hoursNotice','isLate'];
+  var dateHeaders = { scheduledAt: true, cancelledAt: true };
   sheet.clearContents();
+  sheet.clearFormats();
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setBackground(C.navy).setFontColor(C.white).setFontWeight('bold');
-  if (!cancellations.length) return;
+  if (!cancellations.length) { sheet.setFrozenRows(1); return; }
   var values = cancellations.map(function(row) {
     return headers.map(function(h) {
       var v = row[h];
       if (v === null || v === undefined) return '';
+      if (dateHeaders[h] && typeof v === 'string') {
+        var d = new Date(v);
+        if (!isNaN(d.getTime())) return d;
+      }
       return v;
     });
   });
   sheet.getRange(2, 1, values.length, headers.length).setValues(values);
+  // Format scheduledAt (col 6) and cancelledAt (col 7) in Vietnam timezone
+  var dateFmt = 'dd/mm/yy h:mm am/pm';
+  sheet.getRange(2, 6, values.length, 1).setNumberFormat(dateFmt);
+  sheet.getRange(2, 7, values.length, 1).setNumberFormat(dateFmt);
   sheet.setFrozenRows(1);
 }
 
@@ -793,12 +835,12 @@ function _ensureCalendarSheet(ss) {
 
 function _buildCalendarControls(sheet) {
   var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  var now    = new Date();
+  var vnNow  = Utilities.formatDate(new Date(), VN_TZ, 'yyyy-MM').split('-');
   sheet.getRange(1, 1).setValue('Month:').setFontWeight('bold');
   var rule = SpreadsheetApp.newDataValidation().requireValueInList(MONTHS, true).build();
-  sheet.getRange('B1').setDataValidation(rule).setValue(MONTHS[now.getMonth()]).setFontWeight('bold');
+  sheet.getRange('B1').setDataValidation(rule).setValue(MONTHS[parseInt(vnNow[1], 10) - 1]).setFontWeight('bold');
   sheet.getRange(1, 3).setValue('Year:').setFontWeight('bold');
-  sheet.getRange('D1').setValue(now.getFullYear()).setNumberFormat('0').setFontWeight('bold');
+  sheet.getRange('D1').setValue(parseInt(vnNow[0], 10)).setNumberFormat('0').setFontWeight('bold');
   sheet.getRange(1, 5).setValue('Change B1 / D1 to switch month or year')
     .setFontColor(C.hintText).setFontStyle('italic');
   sheet.setFrozenRows(2);
@@ -817,6 +859,7 @@ function renderCalendar(sheet) {
   var lessonsByDay = {};
   try {
     var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var calTz = VN_TZ;
     var lsheet = ss.getSheetByName(LESSONS_SHEET);
     if (lsheet && lsheet.getLastRow() > 1) {
       var data = lsheet.getRange(2, 1, lsheet.getLastRow() - 1, LESSONS_COL_COUNT).getValues();
@@ -827,8 +870,10 @@ function renderCalendar(sheet) {
         if (!dateVal) return;
         var d = dateVal instanceof Date ? dateVal : new Date(dateVal);
         if (isNaN(d.getTime())) return;
-        if (d.getFullYear() !== year || d.getMonth() + 1 !== month) return;
-        var key = String(d.getDate());
+        // Use spreadsheet timezone to extract date parts to avoid runtime-timezone drift
+        var dateParts = Utilities.formatDate(d, calTz, 'yyyy-MM-dd').split('-');
+        if (parseInt(dateParts[0], 10) !== year || parseInt(dateParts[1], 10) !== month) return;
+        var key = String(parseInt(dateParts[2], 10));
         if (!lessonsByDay[key]) lessonsByDay[key] = [];
         lessonsByDay[key].push({
           time:     timeVal || '',
@@ -840,7 +885,10 @@ function renderCalendar(sheet) {
     }
   } catch(e) { Logger.log('renderCalendar error: ' + e.message); }
 
-  var today       = new Date();
+  var todayVn     = Utilities.formatDate(new Date(), VN_TZ, 'yyyy-MM-dd').split('-');
+  var todayYear   = parseInt(todayVn[0], 10);
+  var todayMonth  = parseInt(todayVn[1], 10);
+  var todayDay    = parseInt(todayVn[2], 10);
   var daysInMonth = new Date(year, month, 0).getDate();
   var startDow    = new Date(year, month - 1, 1).getDay();
   var weeks = [], week = [];
@@ -875,9 +923,7 @@ function renderCalendar(sheet) {
         lines.push((l.time ? l.time + '  ' : '') + l.student);
         if (l.course) lines.push('  ' + l.course + (l.instructor ? ' - ' + l.instructor : ''));
       });
-      var isToday = day === today.getDate()
-                 && month === today.getMonth() + 1
-                 && year  === today.getFullYear();
+      var isToday = day === todayDay && month === todayMonth && year === todayYear;
       var bg = isToday ? C.calBlueDark : (lessons.length ? C.calBlue : C.white);
       cell.setValue(lines.join('\\n')).setWrap(true).setVerticalAlignment('top')
         .setBackground(bg)
@@ -900,9 +946,11 @@ function _ensureAuditSheet(ss) {
 }
 
 function _buildAuditControls(sheet) {
-  var now  = new Date();
-  var from = new Date(now.getFullYear(), now.getMonth(), 1);
-  var to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  var vnNow  = Utilities.formatDate(new Date(), VN_TZ, 'yyyy-MM').split('-');
+  var vnYear = parseInt(vnNow[0], 10);
+  var vnMon  = parseInt(vnNow[1], 10) - 1; // 0-indexed
+  var from   = new Date(vnYear, vnMon, 1);
+  var to     = new Date(vnYear, vnMon + 1, 0);
   sheet.getRange(1, 1).setValue('From:').setFontWeight('bold');
   sheet.getRange('B1').setValue(from).setNumberFormat('dd/mm/yyyy').setFontWeight('bold');
   sheet.getRange(1, 3).setValue('To:').setFontWeight('bold');
@@ -916,9 +964,12 @@ function renderAudit(sheet) {
   var fromVal = sheet.getRange('B1').getValue();
   var toVal   = sheet.getRange('D1').getValue();
   if (!fromVal || !toVal) return;
-  var startDate = new Date(fromVal); startDate.setHours(0,0,0,0);
-  var endDate   = new Date(toVal);   endDate.setHours(23,59,59,999);
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
+  var fromDate = new Date(fromVal);
+  var toDate   = new Date(toVal);
+  if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) return;
+  // Compare date strings in Vietnam timezone to avoid runtime-timezone boundary issues
+  var startStr = Utilities.formatDate(fromDate, VN_TZ, 'yyyy-MM-dd');
+  var endStr   = Utilities.formatDate(toDate,   VN_TZ, 'yyyy-MM-dd');
 
   var byInstructor = {};
   try {
@@ -931,7 +982,9 @@ function renderAudit(sheet) {
         var dateVal = r[COL_DATE-1];
         if (!dateVal) return;
         var dt = dateVal instanceof Date ? dateVal : new Date(dateVal);
-        if (isNaN(dt.getTime()) || dt < startDate || dt > endDate) return;
+        if (isNaN(dt.getTime())) return;
+        var dtStr = Utilities.formatDate(dt, VN_TZ, 'yyyy-MM-dd');
+        if (dtStr < startStr || dtStr > endStr) return;
         var instr = (String(r[COL_INSTRUCTOR-1]||'') || 'Unassigned').trim();
         if (!byInstructor[instr]) byInstructor[instr] = [];
         byInstructor[instr].push({
@@ -961,8 +1014,8 @@ function renderAudit(sheet) {
     .setBackground(C.navyMid).setFontColor(C.white).setFontWeight('bold');
   r++;
 
-  var tz     = Session.getScriptTimeZone();
-  var period = Utilities.formatDate(startDate, tz, 'dd/MM/yyyy') + ' - ' + Utilities.formatDate(endDate, tz, 'dd/MM/yyyy');
+  var tz     = VN_TZ;
+  var period = Utilities.formatDate(fromDate, tz, 'dd/MM/yyyy') + ' - ' + Utilities.formatDate(toDate, tz, 'dd/MM/yyyy');
   instructors.forEach(function(name) {
     sheet.getRange(r,1,1,3).setValues([[name, byInstructor[name].length, period]])
       .setBackground(r%2===0 ? C.altRow : C.white);

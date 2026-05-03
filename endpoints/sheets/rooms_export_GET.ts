@@ -2,6 +2,11 @@ import { supabaseAdmin } from "../../helpers/supabaseServer";
 import superjson from "superjson";
 import { format } from "date-fns";
 
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+function toVnDate(date: Date): Date {
+  return new Date(date.getTime() + VN_OFFSET_MS);
+}
+
 export async function handle(request: Request) {
   try {
     const url = new URL(request.url);
@@ -37,9 +42,9 @@ export async function handle(request: Request) {
     const userMap = new Map((users ?? []).map((u: any) => [String(u.id), { name: u.displayname ?? u.email, email: u.email }]));
 
     const result = (bookings as any[]).map((b: any) => ({
-      date: format(new Date(b.start_time), "yyyy-MM-dd"),
-      startTime: format(new Date(b.start_time), "HH:mm"),
-      endTime: format(new Date(b.end_time), "HH:mm"),
+      date: format(toVnDate(new Date(b.start_time)), "yyyy-MM-dd"),
+      startTime: format(toVnDate(new Date(b.start_time)), "HH:mm"),
+      endTime: format(toVnDate(new Date(b.end_time ?? new Date(b.start_time).getTime() + 3600000)), "HH:mm"),
       roomName: roomMap.get(String(b.room_id)) ?? `Room ${b.room_id}`,
       studentName: userMap.get(String(b.user_id))?.name ?? `User ${b.user_id}`,
       studentEmail: userMap.get(String(b.user_id))?.email ?? "",
