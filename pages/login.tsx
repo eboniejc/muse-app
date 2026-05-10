@@ -7,8 +7,8 @@ import { PasswordLoginForm } from "../components/PasswordLoginForm";
 import { PasswordRegisterForm } from "../components/PasswordRegisterForm";
 import { OAuthButtonGroup } from "../components/OAuthButtonGroup";
 import { LanguageToggle } from "../components/LanguageToggle";
+import { BrandMark } from "../components/BrandMark";
 import { useAuth } from "../helpers/useAuth";
-import { Music2 } from "lucide-react";
 import styles from "./login.module.css";
 
 export default function LoginPage() {
@@ -38,7 +38,7 @@ export default function LoginPage() {
         </div>
         <div className={styles.header}>
           <div className={styles.logo}>
-            <Music2 size={32} />
+            <BrandMark size="lg" />
           </div>
           <h1 className={styles.title}>{t("auth.loginTitle")}</h1>
           <p className={styles.subtitle}>{t("auth.loginSubtitle")}</p>

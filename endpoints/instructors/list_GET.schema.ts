@@ -10,6 +10,7 @@ export type Instructor = Pick<
   "id" | "displayName" | "email" | "avatarUrl" | "whatsappNumber"
 > & {
   whatsappLink: string | null;
+  zaloLink: string | null;
 };
 
 export type OutputType = {

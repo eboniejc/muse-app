@@ -31,14 +31,12 @@
 }
 
 .logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 4rem;
-  height: 4rem;
-  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
-  color: var(--primary);
-  border-radius: var(--radius-full);
+  display: inline-block;
+  color: var(--foreground);
+  font-family: var(--font-family-heading);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   margin-bottom: var(--spacing-4);
 }
 

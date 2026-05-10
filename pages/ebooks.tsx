@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet";
 import { useTranslation } from "react-i18next";
 import { useEbooks } from "../helpers/useEbooks";
 import { EbookCard } from "../components/EbookCard";
+import { EbookWithStatus } from "../endpoints/ebooks/list_GET.schema";
 import { Skeleton } from "../components/Skeleton";
 import { Button } from "../components/Button";
 import styles from "./ebooks.module.css";
@@ -13,8 +14,9 @@ export default function EbooksPage() {
   const { t } = useTranslation();
   const { data: ebooks, isLoading } = useEbooks();
   const [filter, setFilter] = useState<FilterType>("all");
+  const mergedEbooks = ebooks ?? [];
 
-  const filteredEbooks = ebooks?.filter((ebook) => {
+  const filteredEbooks = mergedEbooks.filter((ebook) => {
     if (filter === "all") return true;
     if (filter === "unlocked") return ebook.isUnlocked;
     if (filter === "locked") return !ebook.isUnlocked;
@@ -61,7 +63,7 @@ export default function EbooksPage() {
       </div>
 
       <div className={styles.grid}>
-        {isLoading ? (
+        {isLoading && mergedEbooks.length === 0 ? (
           Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className={styles.skeletonCard}>
               <Skeleton className={styles.skeletonCover} />
@@ -73,7 +75,7 @@ export default function EbooksPage() {
               </div>
             </div>
           ))
-        ) : filteredEbooks && filteredEbooks.length > 0 ? (
+        ) : filteredEbooks.length > 0 ? (
           filteredEbooks.map((ebook) => (
             <EbookCard key={ebook.id} ebook={ebook} />
           ))

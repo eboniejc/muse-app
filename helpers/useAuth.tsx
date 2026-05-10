@@ -60,7 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return result.user;
     },
     retry: 1,
-    enabled: true,
     staleTime: Infinity,
   });
 

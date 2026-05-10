@@ -82,33 +82,6 @@ export interface LessonSchedules {
   updatedAt: Generated<Timestamp | null>;
 }
 
-export interface LoginAttempts {
-  attemptedAt: Generated<Timestamp | null>;
-  email: string;
-  id: Generated<number>;
-  success: Generated<boolean | null>;
-}
-
-export interface OauthAccounts {
-  createdAt: Generated<Timestamp | null>;
-  id: Generated<number>;
-  provider: string;
-  providerEmail: string;
-  providerUserId: string;
-  updatedAt: Generated<Timestamp | null>;
-  userId: number;
-}
-
-export interface OauthStates {
-  codeVerifier: string;
-  createdAt: Generated<Timestamp | null>;
-  expiresAt: Timestamp;
-  id: Generated<number>;
-  provider: string;
-  redirectUrl: string;
-  state: string;
-}
-
 export interface RoomBookings {
   createdAt: Generated<Timestamp | null>;
   endTime: Timestamp;
@@ -128,6 +101,7 @@ export interface Rooms {
   equipment: string[] | null;
   hourlyRate: Generated<Numeric | null>;
   id: Generated<number>;
+  imageUrl: string | null;
   isActive: Generated<boolean | null>;
   name: string;
   roomType: Generated<RoomType>;
@@ -139,30 +113,6 @@ export interface Sessions {
   expiresAt: Timestamp;
   id: string;
   lastAccessed: Generated<Timestamp | null>;
-  userId: number;
-}
-
-export interface UserPasswords {
-  createdAt: Generated<Timestamp | null>;
-  id: Generated<number>;
-  passwordHash: string;
-  userId: number;
-}
-
-export interface UserProfiles {
-  address: string | null;
-  bankAccountName: string | null;
-  bankAccountNumber: string | null;
-  bankName: string | null;
-  createdAt: Generated<Timestamp | null>;
-  dateOfBirth: Timestamp | null;
-  fullName: string | null;
-  gender: string | null;
-  id: Generated<number>;
-  phoneNumber: string | null;
-  preferredPaymentMethod: string | null;
-  registrationCompleted: Generated<boolean | null>;
-  updatedAt: Generated<Timestamp | null>;
   userId: number;
 }
 
@@ -183,14 +133,9 @@ export interface DB {
   ebooks: Ebooks;
   lessonCompletions: LessonCompletions;
   lessonSchedules: LessonSchedules;
-  loginAttempts: LoginAttempts;
-  oauthAccounts: OauthAccounts;
-  oauthStates: OauthStates;
   roomBookings: RoomBookings;
   rooms: Rooms;
   sessions: Sessions;
-  userPasswords: UserPasswords;
-  userProfiles: UserProfiles;
   users: Users;
 }
 

@@ -22,7 +22,6 @@ export function useOneSignal() {
         } as any);
         oneSignalInitialized.current = true;
         setIsInitialized(true);
-        // console.log("OneSignal initialized successfully");
       } catch (err) {
         // OneSignal often fails in non-production environments or if blocked by ad-blockers
         // We log it but don't crash the app

@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation, useNavigationType } from "react-router-dom";
 import { GlobalContextProviders } from "./components/_globalContextProviders";
 import Page_0 from "./pages/login.tsx";
 import PageLayout_0 from "./pages/login.pageLayout.tsx";
@@ -21,6 +21,15 @@ import Page_8 from "./pages/courses.$courseId.enroll.tsx";
 import PageLayout_8 from "./pages/courses.$courseId.enroll.pageLayout.tsx";
 import Page_9 from "./pages/admin.tsx";
 import PageLayout_9 from "./pages/admin.pageLayout.tsx";
+import Page_10 from "./pages/instructor-schedule.tsx";
+import PageLayout_10 from "./pages/instructor-schedule.pageLayout.tsx";
+import Page_11 from "./pages/forgot-password.tsx";
+import PageLayout_11 from "./pages/forgot-password.pageLayout.tsx";
+import Page_12 from "./pages/reset-password.tsx";
+import PageLayout_12 from "./pages/reset-password.pageLayout.tsx";
+import Page_13 from "./pages/settings.tsx";
+import PageLayout_13 from "./pages/settings.pageLayout.tsx";
+import "./base.css";
 
 if (!window.requestIdleCallback) {
   window.requestIdleCallback = (cb) => {
@@ -28,9 +37,7 @@ if (!window.requestIdleCallback) {
   };
 }
 
-import "./base.css";
-
-const fileNameToRoute = new Map([["./pages/login.tsx","/login"],["./pages/_index.tsx","/"],["./pages/ebooks.tsx","/ebooks"],["./pages/courses.tsx","/courses"],["./pages/schedule.tsx","/schedule"],["./pages/dashboard.tsx","/dashboard"],["./pages/instructors.tsx","/instructors"],["./pages/complete-registration.tsx","/complete-registration"],["./pages/courses.$courseId.enroll.tsx","/courses/:courseId/enroll"],["./pages/admin.tsx","/admin"]]);
+const fileNameToRoute = new Map([["./pages/login.tsx","/login"],["./pages/_index.tsx","/"],["./pages/ebooks.tsx","/ebooks"],["./pages/courses.tsx","/courses"],["./pages/schedule.tsx","/schedule"],["./pages/dashboard.tsx","/dashboard"],["./pages/instructors.tsx","/instructors"],["./pages/complete-registration.tsx","/complete-registration"],["./pages/courses.$courseId.enroll.tsx","/courses/:courseId/enroll"],["./pages/admin.tsx","/admin"],["./pages/instructor-schedule.tsx","/instructor-schedule"],["./pages/forgot-password.tsx","/forgot-password"],["./pages/reset-password.tsx","/reset-password"],["./pages/settings.tsx","/settings"]]);
 const fileNameToComponent = new Map([
     ["./pages/login.tsx", Page_0],
 ["./pages/_index.tsx", Page_1],
@@ -42,10 +49,15 @@ const fileNameToComponent = new Map([
 ["./pages/complete-registration.tsx", Page_7],
 ["./pages/courses.$courseId.enroll.tsx", Page_8],
 ["./pages/admin.tsx", Page_9],
+["./pages/instructor-schedule.tsx", Page_10],
+["./pages/forgot-password.tsx", Page_11],
+["./pages/reset-password.tsx", Page_12],
+["./pages/settings.tsx", Page_13],
   ]);
 
 function makePageRoute(filename: string) {
   const Component = fileNameToComponent.get(filename);
+  if (!Component) throw new Error(`No component found for route: ${filename}`);
   return <Component />;
 }
 
@@ -116,9 +128,7 @@ function NotFound() {
   );
 }
 
-import { useLocation, useNavigationType } from "react-router-dom";
-
-export default function ScrollManager() {
+function ScrollManager() {
   const { pathname, search, hash } = useLocation();
   const navType = useNavigationType(); // "PUSH" | "REPLACE" | "POP"
 
@@ -152,6 +162,10 @@ export function App() {
 "./pages/complete-registration.tsx": PageLayout_7,
 "./pages/courses.$courseId.enroll.tsx": PageLayout_8,
 "./pages/admin.tsx": PageLayout_9,
+"./pages/instructor-schedule.tsx": PageLayout_10,
+"./pages/forgot-password.tsx": PageLayout_11,
+"./pages/reset-password.tsx": PageLayout_12,
+"./pages/settings.tsx": PageLayout_13,
 }), fileNameToRoute, makePageRoute })} 
           <Route path="*" element={<NotFound />} />
         </Routes>

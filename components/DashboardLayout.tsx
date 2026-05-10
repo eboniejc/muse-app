@@ -1,10 +1,11 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Calendar, GraduationCap, Menu, Music2, BookOpen, Users, Shield } from "lucide-react";
+import { LayoutDashboard, Calendar, GraduationCap, Menu, BookOpen, Users, Shield, CalendarDays } from "lucide-react";
 import { Button } from "./Button";
 import { UserDropdown } from "./UserDropdown";
 import { Sheet, SheetContent, SheetTrigger } from "./Sheet";
 import { LanguageToggle } from "./LanguageToggle";
+import { BrandMark } from "./BrandMark";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../helpers/useAuth";
 import styles from "./DashboardLayout.module.css";
@@ -27,6 +28,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     { label: t('nav.instructors'), href: "/instructors", icon: Users },
   ];
 
+  if (user?.role === "instructor") {
+    navItems.push({ label: "My Schedule", href: "/instructor-schedule", icon: CalendarDays });
+  }
+
   if (user?.role === "admin") {
     navItems.push({ label: t('nav.admin'), href: "/admin", icon: Shield });
   }
@@ -36,8 +41,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       {/* Desktop Sidebar */}
       <aside className={styles.sidebar}>
         <div className={styles.logoContainer}>
-          <Music2 className={styles.logoIcon} />
-          <span className={styles.logoText}>MUSE INC</span>
+          <BrandMark size="md" />
         </div>
         <nav className={styles.nav}>
           {navItems.map((item) => {
@@ -68,8 +72,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
               </SheetTrigger>
               <SheetContent side="left" className={styles.mobileSheet}>
                 <div className={styles.logoContainer}>
-                  <Music2 className={styles.logoIcon} />
-                  <span className={styles.logoText}>MUSE INC</span>
+                  <BrandMark size="md" />
                 </div>
                 <nav className={styles.mobileNav}>
                   {navItems.map((item) => {

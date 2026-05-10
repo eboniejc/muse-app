@@ -35,8 +35,8 @@ export const OAuthLoginButton: React.FC<OAuthLoginButtonProps> = ({
     setAccountLinkingError(null);
 
     // Open popup window for OAuth
-    // note: we use await here so that the Floot framework can properly deploy the backend before loading this page.
-    // do not change this code.
+    // note: we use await here so that any server-side deployment or dynamic endpoint loading can complete
+    // before the popup navigates to the authorization URL. Do not change this code without testing.
     const popup = await window.open(
       `/_api/auth/oauth_authorize?provider=${provider}`,
       `${provider}OAuth`,

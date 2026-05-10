@@ -1,0 +1,115 @@
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  color: var(--foreground);
+}
+
+.mark {
+  width: 1.7rem;
+  height: 1.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  display: block;
+  /* Outline effect so white/transparent logos are visible on white backgrounds */
+  filter:
+    drop-shadow(0 1px 1px hsl(222 47% 11% / 0.22))
+    drop-shadow(1px 0 0 hsl(222 47% 11% / 0.55))
+    drop-shadow(-1px 0 0 hsl(222 47% 11% / 0.55))
+    drop-shadow(0 1px 0 hsl(222 47% 11% / 0.55))
+    drop-shadow(0 -1px 0 hsl(222 47% 11% / 0.55));
+}
+
+:global(.dark) .img {
+  filter:
+    drop-shadow(0 1px 1px hsl(0 0% 0% / 0.60))
+    drop-shadow(1px 0 0 hsl(0 0% 0% / 0.75))
+    drop-shadow(-1px 0 0 hsl(0 0% 0% / 0.75))
+    drop-shadow(0 1px 0 hsl(0 0% 0% / 0.75))
+    drop-shadow(0 -1px 0 hsl(0 0% 0% / 0.75));
+}
+
+.hasImg .mark {
+  overflow: visible;
+  box-sizing: border-box;
+  padding: 1px; /* give the outline/shadow room so it doesn't clip */
+}
+
+.backplate .mark {
+  background-color: hsl(222 47% 11%);
+  border-radius: 0;
+}
+
+.stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.strokeThin {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wordmark {
+  font-family: var(--font-family-heading);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.05em;
+  color: currentColor;
+}
+
+.brand[data-size="sm"] {
+  gap: var(--spacing-2);
+}
+
+.brand[data-size="sm"] .mark {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.brand[data-size="sm"] .wordmark {
+  font-size: 0.95rem;
+}
+
+.brand[data-size="lg"] .mark {
+  width: 2.2rem;
+  height: 2.2rem;
+}
+
+.brand[data-size="lg"] .wordmark {
+  font-size: 1.35rem;
+}
+
+.brand[data-size="xl"] {
+  gap: var(--spacing-4);
+}
+
+.brand[data-size="xl"] .mark {
+  width: 3.1rem;
+  height: 3.1rem;
+}
+
+.brand[data-size="xl"] .wordmark {
+  font-size: clamp(2rem, 6vw, 4rem);
+  letter-spacing: 0.06em;
+}

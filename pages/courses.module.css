@@ -76,4 +76,12 @@
   .filterWrapper {
     width: 100%;
   }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .searchWrapper {
+    min-width: 0;
+  }
 }

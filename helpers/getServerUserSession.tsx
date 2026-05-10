@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { supabaseAdmin } from "./supabaseServer";
 import { User } from "./User";
 
 import {
@@ -7,6 +7,21 @@ import {
   NotAuthenticatedError,
   SessionExpirationSeconds,
 } from "./getSetServerSession";
+
+function normalizeUserRow(userRow: any): User {
+  return {
+    id: userRow.id,
+    email: userRow.email,
+    displayName:
+      userRow.displayName ??
+      userRow.displayname ??
+      userRow.display_name ??
+      userRow.email,
+    avatarUrl:
+      userRow.avatarUrl ?? userRow.avatarurl ?? userRow.avatar_url ?? null,
+    role: userRow.role,
+  };
+}
 
 export async function getServerUserSession(request: Request) {
   const session = await getServerSessionOrThrow(request);
@@ -17,54 +32,58 @@ export async function getServerUserSession(request: Request) {
       Date.now() - SessionExpirationSeconds * 1000
     );
     try {
-      await db
-        .deleteFrom("sessions")
-        .where("lastAccessed", "<", expirationDate)
-        .execute();
+      await supabaseAdmin
+        .from("sessions")
+        .delete()
+        .lt("lastaccessed", expirationDate.toISOString());
     } catch (cleanupError) {
       // Log but don't fail the request if cleanup fails
       console.error("Session cleanup error:", cleanupError);
     }
   }
 
-  // Query the sessions and users tables in a single join query
-  const results = await db
-    .selectFrom("sessions")
-    .innerJoin("users", "sessions.userId", "users.id")
-    .select([
-      "sessions.id as sessionId",
-      "sessions.createdAt as sessionCreatedAt",
-      "sessions.lastAccessed as sessionLastAccessed",
-      "users.id",
-      "users.email",
-      "users.displayName",
-      "users.role",
-      "users.avatarUrl",
-    ])
-    .where("sessions.id", "=", session.id)
+  const { data: sessionRow, error: sessionErr } = await supabaseAdmin
+    .from("sessions")
+    .select("id,userid,createdat,lastaccessed")
+    .eq("id", session.id)
     .limit(1)
-    .execute();
+    .maybeSingle();
 
-  if (results.length === 0) {
+  if (sessionErr) {
+    throw sessionErr;
+  }
+
+  if (!sessionRow) {
     throw new NotAuthenticatedError();
   }
 
-  const result = results[0];
-  const user = {
-    id: result.id,
-    email: result.email,
-    displayName: result.displayName,
-    avatarUrl: result.avatarUrl,
-    role: result.role,
-  };
+  const { data: userRow, error: userErr } = await supabaseAdmin
+    .from("users")
+    .select("*")
+    .eq("id", sessionRow.userid)
+    .limit(1)
+    .maybeSingle();
+
+  if (userErr) {
+    throw userErr;
+  }
+
+  if (!userRow) {
+    throw new NotAuthenticatedError();
+  }
+
+  const user = normalizeUserRow(userRow);
 
   // Update the session's lastAccessed timestamp
   const now = new Date();
-  await db
-    .updateTable("sessions")
-    .set({ lastAccessed: now })
-    .where("id", "=", session.id)
-    .execute();
+  const { error: updateErr } = await supabaseAdmin
+    .from("sessions")
+    .update({ lastaccessed: now.toISOString() })
+    .eq("id", session.id);
+
+  if (updateErr) {
+    throw updateErr;
+  }
 
   return {
     user: user satisfies User,

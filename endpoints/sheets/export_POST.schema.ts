@@ -29,8 +29,10 @@ export type ExportData = {
   })[];
   lessonCompletions: Selectable<LessonCompletions>[];
   lessonSchedules: Selectable<LessonSchedules>[];
+  events: Record<string, unknown>[];
   users: Selectable<Users>[];
   userProfiles: Selectable<UserProfiles>[];
+  flattenedEnrollments: Record<string, unknown>[];
 };
 
 export type OutputType = {

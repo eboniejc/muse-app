@@ -1,1 +1,10 @@
 node_modules
+dist/
+!dist/.gitkeep
+env.json
+.env
+.DS_Store
+server.log
+yarn-error.log
+tmp_debug.ts
+tmp_import_test.mjs

@@ -1,6 +1,6 @@
 .layout {
   display: flex;
-  min-height: 100vh;
+  min-height: 100svh;
   background-color: var(--background);
   color: var(--foreground);
 }
@@ -16,6 +16,7 @@
   bottom: 0;
   left: 0;
   z-index: var(--z-nav);
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .logoContainer {
@@ -23,21 +24,15 @@
   display: flex;
   align-items: center;
   padding: 0 var(--spacing-6);
-  gap: var(--spacing-3);
   border-bottom: 1px solid var(--border);
-}
-
-.logoIcon {
-  color: var(--primary);
-  width: 24px;
-  height: 24px;
 }
 
 .logoText {
   font-family: var(--font-family-heading);
   font-weight: 700;
-  font-size: 1.25rem;
-  letter-spacing: -0.02em;
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  color: var(--foreground);
 }
 
 .nav {
@@ -77,12 +72,12 @@
 }
 
 .header {
-  height: 4rem;
+  height: calc(4rem + env(safe-area-inset-top, 0px));
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--spacing-6);
+  padding: env(safe-area-inset-top, 0px) var(--spacing-6) 0;
   background-color: var(--background);
   position: sticky;
   top: 0;

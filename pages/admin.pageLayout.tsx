@@ -1,4 +1,4 @@
-import { AdminRoute } from "../components/ProtectedRoute";
+import { AdminPasswordGate } from "../components/ProtectedRoute";
 import DashboardLayout from "../components/DashboardLayout";
 
-export default [AdminRoute, DashboardLayout];
+export default [AdminPasswordGate, DashboardLayout];

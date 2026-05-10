@@ -4,7 +4,7 @@ import { Selectable } from "kysely";
 import { RoomBookings } from "../../../helpers/schema";
 
 export const schema = z.object({
-  bookingId: z.number(),
+  bookingId: z.coerce.number(),
 });
 
 export type OutputType = {

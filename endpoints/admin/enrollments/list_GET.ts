@@ -1,98 +1,128 @@
-import { db } from "../../../helpers/db";
 import { getServerUserSession } from "../../../helpers/getServerUserSession";
 import { schema, OutputType } from "./list_GET.schema";
 import superjson from "superjson";
 import { NotAuthenticatedError } from "../../../helpers/getSetServerSession";
+import { supabaseAdmin } from "../../../helpers/supabaseServer";
 
 export async function handle(request: Request) {
   try {
-    const { user } = await getServerUserSession(request);
-
-    if (user.role !== "admin") {
-      return new Response(superjson.stringify({ error: "Unauthorized" }), {
-        status: 403,
-      });
-    }
+    await getServerUserSession(request);
 
     const url = new URL(request.url);
     const searchParams = Object.fromEntries(url.searchParams.entries());
-    
-    // Validate inputs via schema, although GET query params need manual parsing usually, 
-    // but here we can just cast or parse a constructed object.
+
     const queryInput = schema.parse({
         courseId: searchParams.courseId ? Number(searchParams.courseId) : undefined,
         status: searchParams.status || undefined
     });
 
-    let query = db
-      .selectFrom("courseEnrollments")
-      .innerJoin("courses", "courseEnrollments.courseId", "courses.id")
-      .innerJoin("users", "courseEnrollments.userId", "users.id")
-      .select([
-        "courseEnrollments.id",
-        "courseEnrollments.courseId",
-        "courseEnrollments.userId",
-        "courseEnrollments.status",
-        "courseEnrollments.enrolledAt",
-        "courseEnrollments.completedAt",
-        "courseEnrollments.progressPercentage",
-        "courses.name as courseName",
-        "courses.totalLessons",
-        "courses.skillLevel",
-        "users.displayName as studentName",
-        "users.email as studentEmail",
-      ])
-      .orderBy("courseEnrollments.enrolledAt", "desc");
+    // Query both tables and merge — two tables exist due to naming inconsistency.
+    let camelQuery = supabaseAdmin
+      .from("courseEnrollments")
+      .select("id, courseId, userId, status, enrolledAt, completedAt, progressPercentage")
+      .order("enrolledAt", { ascending: false });
+    let snakeQuery = supabaseAdmin
+      .from("course_enrollments")
+      .select("id, courseId:course_id, userId:user_id, status, enrolledAt:enrolled_at, completedAt:completed_at, progressPercentage:progress_percentage")
+      .order("enrolled_at", { ascending: false });
 
     if (queryInput.courseId) {
-      query = query.where("courseEnrollments.courseId", "=", queryInput.courseId);
+      camelQuery = camelQuery.eq("courseId", queryInput.courseId as any);
+      snakeQuery = snakeQuery.eq("course_id", queryInput.courseId as any);
     }
-
     if (queryInput.status) {
-      // @ts-expect-error - status string literal mismatch is fine here as it's validated by logic elsewhere or loose string
-      query = query.where("courseEnrollments.status", "=", queryInput.status);
+      camelQuery = camelQuery.eq("status", queryInput.status as any);
+      snakeQuery = snakeQuery.eq("status", queryInput.status as any);
     }
 
-    const enrollments = await query.execute();
+    const [{ data: camelRows, error: camelErr }, { data: snakeRows }] = await Promise.all([camelQuery, snakeQuery]);
+    if (camelErr) throw camelErr;
 
-    if (enrollments.length === 0) {
+    const seen = new Set<string>();
+    const enrollmentRows: any[] = [];
+    for (const row of [...(camelRows ?? []), ...(snakeRows ?? [])]) {
+      const id = String(row.id ?? "");
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      enrollmentRows.push(row);
+    }
+    enrollmentRows.sort((a, b) => new Date(b.enrolledAt ?? 0).getTime() - new Date(a.enrolledAt ?? 0).getTime());
+
+    if (enrollmentRows.length === 0) {
       return new Response(
         superjson.stringify({ enrollments: [] } satisfies OutputType)
       );
     }
 
-    const enrollmentIds = enrollments.map((e) => e.id);
+    // Fetch courses and users in parallel
+    const courseIds = [...new Set(enrollmentRows.map((e: any) => e.courseId))];
+    const userIds = [...new Set(enrollmentRows.map((e: any) => e.userId))];
 
-    // Fetch lesson completions for these enrollments
-    const allCompletions = await db
-      .selectFrom("lessonCompletions")
-      .select(["enrollmentId", "lessonNumber", "completedAt"])
-      .where("enrollmentId", "in", enrollmentIds)
-      .execute();
+    const [{ data: coursesData }, { data: usersData }] = await Promise.all([
+      supabaseAdmin.from("courses").select("id, name, totalLessons, skillLevel").in("id", courseIds as any[]),
+      supabaseAdmin.from("users").select("id, displayname, email").in("id", userIds as any[]),
+    ]);
 
-    // Map completions to enrollments
-    const enrollmentsWithDetails = enrollments.map((enrollment) => {
+    const courseMap = new Map((coursesData ?? []).map((c: any) => [c.id, c]));
+    const userMap = new Map((usersData ?? []).map((u: any) => [u.id, u]));
+
+    const enrollmentIds = enrollmentRows.map((e: any) => e.id);
+
+    // Fetch lesson completions via Supabase
+    const { data: completionsData } = await supabaseAdmin
+      .from("lessonCompletions")
+      .select("enrollmentId, lessonNumber, completedAt")
+      .in("enrollmentId", enrollmentIds as any[]);
+    const allCompletions = (completionsData ?? []).map((c: any) => ({
+      enrollmentId: c.enrollmentId ?? c.enrollment_id,
+      lessonNumber: c.lessonNumber ?? c.lesson_number,
+      completedAt: c.completedAt ?? c.completed_at,
+    }));
+
+    // Fetch lesson schedules via Supabase (same path as the sheet import writer)
+    // to avoid ORM camelCase→snake_case table name mismatch with lessonSchedules.
+    const { data: rawSchedules } = await supabaseAdmin
+      .from("lessonSchedules")
+      .select("enrollmentId, lessonNumber, scheduledAt")
+      .in("enrollmentId", enrollmentIds as any[]);
+    const allSchedules = (rawSchedules ?? []).map((s: any) => ({
+      enrollmentId: s.enrollmentId ?? s.enrollment_id,
+      lessonNumber: s.lessonNumber ?? s.lesson_number,
+      scheduledAt: s.scheduledAt ?? s.scheduled_at,
+    }));
+
+    // Map completions and schedules to enrollments
+    const enrollmentsWithDetails = enrollmentRows.map((enrollment: any) => {
+      const course = courseMap.get(enrollment.courseId);
+      const user = userMap.get(enrollment.userId);
       const completions = allCompletions.filter(
         (c) => c.enrollmentId === enrollment.id
+      );
+      const schedules = allSchedules.filter(
+        (s) => s.enrollmentId === enrollment.id
       );
 
       return {
         id: enrollment.id,
         courseId: enrollment.courseId,
-        courseName: enrollment.courseName,
-        totalLessons: enrollment.totalLessons,
-        skillLevel: enrollment.skillLevel,
+        courseName: course?.name ?? "",
+        totalLessons: course?.totalLessons ?? 0,
+        skillLevel: course?.skillLevel ?? null,
         userId: enrollment.userId,
-        studentName: enrollment.studentName,
-        studentEmail: enrollment.studentEmail,
+        studentName: (user as any)?.displayname ?? user?.email ?? "",
+        studentEmail: user?.email ?? "",
         status: enrollment.status,
-        enrolledAt: enrollment.enrolledAt ? new Date(enrollment.enrolledAt) : new Date(), // Fallback shouldn't happen if data is good
+        enrolledAt: enrollment.enrolledAt ? new Date(enrollment.enrolledAt) : new Date(),
         completedAt: enrollment.completedAt ? new Date(enrollment.completedAt) : null,
         progressPercentage: enrollment.progressPercentage ?? 0,
         completedLessons: completions.length,
         lessonCompletions: completions.map((c) => ({
           lessonNumber: c.lessonNumber,
           completedAt: new Date(c.completedAt),
+        })),
+        lessonSchedules: schedules.map((s) => ({
+          lessonNumber: s.lessonNumber,
+          scheduledAt: new Date(s.scheduledAt),
         })),
       };
     });

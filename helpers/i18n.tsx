@@ -116,6 +116,8 @@ const resources = {
         cancelError: "Failed to cancel booking",
         selectRoomFirst: "Please select a room first",
         noBookings: "No bookings for this day. Be the first!",
+        cancelBooking: "Cancel Booking",
+        keep: "Keep",
       },
       dashboard: {
         welcome: "Welcome back, {{name}}",
@@ -123,10 +125,12 @@ const resources = {
         upcomingClasses: "Upcoming Classes",
         courseProgress: "Course Progress",
         upcomingSessions: "Upcoming Sessions",
+        upcomingEvents: "Upcoming Events",
         activeCourses: "Active Courses",
         practiceTime: "Practice Time",
         myCourses: "My Courses",
         noSessions: "No upcoming sessions scheduled.",
+        noEvents: "No upcoming events.",
         noCourses: "You haven't enrolled in any courses yet.",
       },
       registration: {
@@ -306,6 +310,8 @@ const resources = {
         cancelError: "Hủy đặt phòng thất bại",
         selectRoomFirst: "Vui lòng chọn phòng trước",
         noBookings: "Chưa có đặt phòng ngày này. Hãy là người đầu tiên!",
+        cancelBooking: "Hủy đặt phòng",
+        keep: "Giữ",
       },
       dashboard: {
         welcome: "Chào mừng, {{name}}",
@@ -313,10 +319,12 @@ const resources = {
         upcomingClasses: "Lớp học sắp tới",
         courseProgress: "Tiến độ khóa học",
         upcomingSessions: "Buổi học sắp tới",
+        upcomingEvents: "Sự kiện sắp tới",
         activeCourses: "Khóa học đang học",
         practiceTime: "Thời gian luyện tập",
         myCourses: "Khóa học của tôi",
         noSessions: "Chưa có buổi học nào được lên lịch.",
+        noEvents: "Không có sự kiện sắp tới.",
         noCourses: "Bạn chưa đăng ký khóa học nào.",
       },
       registration: {

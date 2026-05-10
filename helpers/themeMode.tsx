@@ -73,6 +73,7 @@ export function switchToAutoMode(): void {
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   mediaQuery.onchange = (e: MediaQueryListEvent) => {
     updateTheme(e.matches);
+    notifyThemeChange();
   };
   currentMediaQuery = mediaQuery;
   updateTheme(mediaQuery.matches);

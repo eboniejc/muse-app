@@ -20,6 +20,7 @@ export type CourseWithDetails = Pick<
   instructorName: string | null;
   instructorAvatar: string | null;
   enrolledCount: number;
+  coverImageUrl: string | null;
 };
 
 export type OutputType = {

@@ -5,16 +5,78 @@ import { MapPin, Phone, Mail } from "lucide-react";
 import { useInstructors } from "../helpers/useInstructors";
 import { InstructorCard } from "../components/InstructorCard";
 import { Skeleton } from "../components/Skeleton";
+import { BrandMark } from "../components/BrandMark";
+import { Instructor } from "../endpoints/instructors/list_GET.schema";
 import styles from "./instructors.module.css";
 
 export default function InstructorsPage() {
   const { t } = useTranslation();
   const { data: instructors, isLoading } = useInstructors();
+  const presetInstructors: Instructor[] = [
+    {
+      id: -1,
+      displayName: "DJ Phatbeatz",
+      email: "Info.djphat@gmail.com",
+      avatarUrl: null,
+      whatsappNumber: "+84902957911",
+      whatsappLink: "https://wa.me/84902957911",
+      zaloLink: "https://zalo.me/0902957911",
+    },
+    {
+      id: -2,
+      displayName: "DJ Napple",
+      email: "djnapple@gmail.com",
+      avatarUrl: null,
+      whatsappNumber: "+84932484884",
+      whatsappLink: "https://wa.me/84932484884",
+      zaloLink: "https://zalo.me/0932484884",
+    },
+    {
+      id: -3,
+      displayName: "DJ Zackie",
+      email: "thienga1110@gmail.com",
+      avatarUrl: null,
+      whatsappNumber: "+84909515597",
+      whatsappLink: "https://wa.me/84909515597",
+      zaloLink: "https://zalo.me/0909515597",
+    },
+    {
+      id: -4,
+      displayName: "DJ Zbuzh",
+      email: "Djzbuzhh1304@gmail.com",
+      avatarUrl: null,
+      whatsappNumber: "+84932222292",
+      whatsappLink: "https://wa.me/84932222292",
+      zaloLink: "https://zalo.me/0932222292",
+    },
+    {
+      id: -5,
+      displayName: "Jake",
+      email: "dj.jakeryan95@gmail.com",
+      avatarUrl: null,
+      whatsappNumber: "+84338997839",
+      whatsappLink: "https://wa.me/84338997839",
+      zaloLink: "https://zalo.me/0338997839",
+    },
+  ];
+
+  const mergedInstructors = React.useMemo(() => {
+    const deduped = new Map<string, Instructor>();
+
+    [...presetInstructors, ...(instructors ?? [])].forEach((inst) => {
+      const phoneKey = (inst.whatsappNumber || "").replace(/\D/g, "");
+      const nameKey = inst.displayName.toLowerCase().trim();
+      const key = phoneKey || nameKey;
+      deduped.set(key, inst);
+    });
+
+    return Array.from(deduped.values());
+  }, [instructors]);
 
   return (
     <div className={styles.container}>
       <Helmet>
-        <title>Instructors - DJ School</title>
+        <title>Instructors - MUSE INC</title>
       </Helmet>
 
       <div className={styles.header}>
@@ -25,7 +87,7 @@ export default function InstructorsPage() {
       </div>
 
       <div className={styles.grid}>
-        {isLoading ? (
+        {isLoading && mergedInstructors.length === 0 ? (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className={styles.skeletonCard}>
               <div className={styles.skeletonHeader}>
@@ -38,8 +100,8 @@ export default function InstructorsPage() {
               <Skeleton className={styles.skeletonButton} />
             </div>
           ))
-        ) : instructors && instructors.length > 0 ? (
-          instructors.map((instructor) => (
+        ) : mergedInstructors.length > 0 ? (
+          mergedInstructors.map((instructor) => (
             <InstructorCard key={instructor.id} instructor={instructor} />
           ))
         ) : (
@@ -51,7 +113,9 @@ export default function InstructorsPage() {
 
       <footer className={styles.footer}>
         <div className={styles.contactInfo}>
-          <h3 className={styles.contactTitle}>MUSE Inc.</h3>
+          <div className={styles.contactTitle}>
+            <BrandMark size="md" />
+          </div>
           <div className={styles.contactItem}>
             <MapPin size={18} className={styles.icon} />
             <span>409 Hai Bà Trưng, Phường Xuân Hoà, TP Ho Chi Minh City, Vietnam</span>

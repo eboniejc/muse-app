@@ -1,17 +1,17 @@
-import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useForm, Form, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "./Form";
 import { Input } from "./Input";
 import { Button } from "./Button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./Select";
-import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
-import { Calendar } from "./Calendar";
 import { Checkbox } from "./Checkbox";
 import { useUpdateUserProfile, useUserProfile } from "../helpers/useUserProfile";
+import { useEnrollCourse } from "../helpers/useEnrollCourse";
+import { useCourses } from "../helpers/useCourses";
 import { schema as profileSchema } from "../endpoints/user/profile_POST.schema";
+import { toast } from "sonner";
 import styles from "./RegistrationForm.module.css";
 
 // Extend the schema to handle the UI specific logic if needed, 
@@ -27,8 +27,14 @@ type FormValues = z.infer<typeof formSchema>;
 
 export const RegistrationForm = () => {
   const navigate = useNavigate();
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [searchParams] = useSearchParams();
+  const selectedCourseId = Number(searchParams.get("courseId"));
+  const hasSelectedCourse = Number.isFinite(selectedCourseId) && selectedCourseId > 0;
   const { data: profile, isLoading } = useUserProfile();
-  const { mutate: updateProfile, isPending } = useUpdateUserProfile();
+  const { data: courses } = useCourses();
+  const { mutateAsync: updateProfile, isPending } = useUpdateUserProfile();
+  const enrollCourseMutation = useEnrollCourse();
 
   const form = useForm({
     schema: formSchema,
@@ -62,19 +68,93 @@ export const RegistrationForm = () => {
     }
   }, [profile, form.setValues]);
 
-  const onSubmit = (values: FormValues) => {
-    updateProfile(values, {
-      onSuccess: () => {
-        navigate("/dashboard");
-      },
-    });
+  const onSubmit = async (values: FormValues) => {
+    try {
+      await updateProfile(values);
+
+      const selectedCourse = hasSelectedCourse
+        ? courses?.find((c) => c.id === selectedCourseId)
+        : null;
+
+      if (hasSelectedCourse) {
+        await enrollCourseMutation.mutateAsync({ courseId: selectedCourseId });
+      }
+
+      setIsSubmitted(true);
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to complete registration");
+      }
+    }
   };
+
+  // DOB split-select state
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobDay, setDobDay] = useState("");
+  const [dobYear, setDobYear] = useState("");
+
+  // Sync split selects → form value (noon Vietnam time = UTC+7, so store as 05:00 UTC)
+  useEffect(() => {
+    if (dobMonth && dobDay && dobYear) {
+      // Use noon Vietnam time to prevent UTC midnight rollover shifting the date
+      const isoString = `${dobYear}-${String(dobMonth).padStart(2, "0")}-${String(dobDay).padStart(2, "0")}T05:00:00.000Z`;
+      const d = new Date(isoString);
+      if (!isNaN(d.getTime())) {
+        form.setValues({ ...form.values, dateOfBirth: d });
+      }
+    } else {
+      form.setValues({ ...form.values, dateOfBirth: undefined });
+    }
+  }, [dobMonth, dobDay, dobYear]);
+
+  // Sync form value → split selects when profile loads
+  useEffect(() => {
+    const dob = form.values.dateOfBirth;
+    if (dob) {
+      const d = new Date(dob);
+      setDobMonth(String(d.getMonth() + 1));
+      setDobDay(String(d.getDate()));
+      setDobYear(String(d.getFullYear()));
+    }
+  }, [profile]);
+
+  const currentYear = new Date().getFullYear();
+  const dobYears = Array.from({ length: 101 }, (_, i) => currentYear - i);
+  const dobMonths = [
+    { value: "1", label: "January" }, { value: "2", label: "February" },
+    { value: "3", label: "March" }, { value: "4", label: "April" },
+    { value: "5", label: "May" }, { value: "6", label: "June" },
+    { value: "7", label: "July" }, { value: "8", label: "August" },
+    { value: "9", label: "September" }, { value: "10", label: "October" },
+    { value: "11", label: "November" }, { value: "12", label: "December" },
+  ];
+  const daysInMonth = dobMonth && dobYear
+    ? new Date(Number(dobYear), Number(dobMonth), 0).getDate()
+    : 31;
+  const dobDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   const paymentMethod = form.values.preferredPaymentMethod;
   const isBankTransfer = paymentMethod === "Bank Transfer";
 
   if (isLoading) {
     return <div className={styles.loading}>Loading profile data...</div>;
+  }
+
+  if (isSubmitted) {
+    return (
+      <div className={styles.successState}>
+        <CheckCircle2 size={56} className={styles.successIcon} />
+        <h2 className={styles.successTitle}>Đăng ký thành công! (Registration Complete!)</h2>
+        <p className={styles.successText}>
+          Your profile has been saved. Welcome to MUSE INC!
+        </p>
+        <Button size="lg" onClick={() => navigate("/dashboard")}>
+          Go to Dashboard
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -118,34 +198,38 @@ export const RegistrationForm = () => {
 
             <FormItem name="dateOfBirth" className={styles.halfWidth}>
               <FormLabel>Ngày Sinh (Date of Birth)</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant="outline"
-                      className={`${styles.dateButton} ${!form.values.dateOfBirth ? styles.mutedText : ""}`}
-                    >
-                      {form.values.dateOfBirth ? (
-                        format(form.values.dateOfBirth, "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <CalendarIcon className={styles.calendarIcon} />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className={styles.calendarPopover} align="start" removeBackgroundAndPadding>
-                  <Calendar
-                    mode="single"
-                    selected={form.values.dateOfBirth || undefined}
-                    onSelect={(date) => form.setValues(prev => ({ ...prev, dateOfBirth: date || null }))}
-                    disabled={(date) =>
-                      date > new Date() || date < new Date("1900-01-01")
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className={styles.dobRow}>
+                <select
+                  className={styles.dobSelect}
+                  value={dobMonth}
+                  onChange={(e) => setDobMonth(e.target.value)}
+                >
+                  <option value="">Month</option>
+                  {dobMonths.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+                <select
+                  className={styles.dobSelect}
+                  value={dobDay}
+                  onChange={(e) => setDobDay(e.target.value)}
+                >
+                  <option value="">Day</option>
+                  {dobDays.map((d) => (
+                    <option key={d} value={String(d)}>{d}</option>
+                  ))}
+                </select>
+                <select
+                  className={styles.dobSelect}
+                  value={dobYear}
+                  onChange={(e) => setDobYear(e.target.value)}
+                >
+                  <option value="">Year</option>
+                  {dobYears.map((y) => (
+                    <option key={y} value={String(y)}>{y}</option>
+                  ))}
+                </select>
+              </div>
               <FormMessage />
             </FormItem>
           </div>
@@ -241,8 +325,15 @@ export const RegistrationForm = () => {
         </div>
 
         <div className={styles.actions}>
-          <Button type="submit" size="lg" disabled={isPending} className={styles.submitButton}>
-            {isPending ? "Saving..." : "Hoàn Tất Đăng Ký (Complete Registration)"}
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isPending || enrollCourseMutation.isPending}
+            className={styles.submitButton}
+          >
+            {isPending || enrollCourseMutation.isPending
+              ? "Saving..."
+              : "Hoàn Tất Đăng Ký (Complete Registration)"}
           </Button>
         </div>
       </form>

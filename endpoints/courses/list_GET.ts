@@ -1,49 +1,78 @@
-import { db } from "../../helpers/db";
+import { supabaseAdmin } from "../../helpers/supabaseServer";
 import superjson from "superjson";
 import { OutputType } from "./list_GET.schema";
 
+const csvFallbackCourses: OutputType["courses"] = [];
+
+function isMissingTableError(error: unknown, tableName: string): boolean {
+  const maybeErr = error as { code?: string; message?: string } | null;
+  if (!maybeErr) return false;
+  return (
+    maybeErr.code === "PGRST205" &&
+    maybeErr.message?.includes(`public.${tableName}`) === true
+  );
+}
+
 export async function handle(request: Request) {
   try {
-    // Public endpoint
+    // Public endpoint - fetch active courses with instructor info.
+    // Retry with alternate user avatar column names for schema compatibility.
+    let { data: courses, error: coursesErr } = await supabaseAdmin
+      .from('courses')
+      .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,coverImageUrl,users(displayname,avatarUrl)');
 
-    // Join with users to get instructor name
-    // Also count enrollments for each course
-    const courses = await db
-      .selectFrom("courses")
-      .leftJoin("users", "courses.instructorId", "users.id")
-      .select([
-        "courses.id",
-        "courses.name",
-        "courses.description",
-        "courses.totalLessons",
-        "courses.maxStudents",
-        "courses.skillLevel",
-        "courses.price",
-        "courses.isActive",
-        "courses.instructorId",
-        "users.displayName as instructorName",
-        "users.avatarUrl as instructorAvatar",
-      ])
-      .where("courses.isActive", "=", true)
-      .execute();
+    if (coursesErr?.code === "42703") {
+      const retry = await supabaseAdmin
+        .from('courses')
+        .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,coverImageUrl,users(displayname,avatarurl)');
+      courses = retry.data;
+      coursesErr = retry.error;
+    }
 
-    // Get enrollment counts separately or via subquery.
-    // Doing a separate query for counts is often cleaner if we don't want complex group bys with all columns
-    const enrollmentCounts = await db
-      .selectFrom("courseEnrollments")
-      .select((eb) => [
-        "courseId",
-        eb.fn.count<number>("id").as("count"),
-      ])
-      .where("status", "=", "active")
-      .groupBy("courseId")
-      .execute();
+    if (coursesErr?.code === "42703") {
+      const retry = await supabaseAdmin
+        .from('courses')
+        .select('id,name,description,totalLessons,maxStudents,skillLevel,price,isActive,instructorId,coverImageUrl,users(displayname)');
+      courses = retry.data;
+      coursesErr = retry.error;
+    }
 
-    const countMap = new Map(
-      enrollmentCounts.map((c) => [c.courseId, Number(c.count)])
-    );
+    if (coursesErr) {
+      if (isMissingTableError(coursesErr, "courses")) {
+        return new Response(
+          superjson.stringify({
+            courses: csvFallbackCourses,
+          } satisfies OutputType)
+        );
+      }
+      throw coursesErr;
+    }
 
-    const resultCourses = courses.map((course) => ({
+    if (!courses || courses.length === 0) {
+      return new Response(
+        superjson.stringify({
+          courses: [],
+        } satisfies OutputType)
+      );
+    }
+
+    // Get enrollment counts from both tables and merge
+    const [camelEnroll, snakeEnroll] = await Promise.all([
+      supabaseAdmin.from('courseEnrollments').select('courseId').eq('status', 'active'),
+      supabaseAdmin.from('course_enrollments').select('course_id').eq('status', 'active'),
+    ]);
+
+    if (camelEnroll.error && !isMissingTableError(camelEnroll.error, "courseEnrollments")) {
+      throw camelEnroll.error;
+    }
+
+    const countMap = new Map<string, number>();
+    [...(camelEnroll.data || []), ...(snakeEnroll.data || [])].forEach((e: any) => {
+      const id = String(e.courseId ?? e.course_id);
+      countMap.set(id, (countMap.get(id) || 0) + 1);
+    });
+
+    const mappedCourses = (courses || []).map((course: any) => ({
       id: course.id,
       name: course.name,
       description: course.description,
@@ -53,10 +82,33 @@ export async function handle(request: Request) {
       price: course.price ? String(course.price) : null,
       isActive: course.isActive,
       instructorId: course.instructorId,
-      instructorName: course.instructorName,
-      instructorAvatar: course.instructorAvatar,
-      enrolledCount: countMap.get(course.id!) || 0,
+      instructorName: course.users?.displayname || null,
+      instructorAvatar: course.users?.avatarUrl || course.users?.avatarurl || null,
+      enrolledCount: countMap.get(String(course.id)) || 0,
+      coverImageUrl: course.coverImageUrl || null,
     }));
+
+    // Defensive dedupe: if duplicate active rows exist for the same course name,
+    // keep a single canonical row in API output.
+    const dedupedByName = new Map<string, (typeof mappedCourses)[number]>();
+    for (const course of mappedCourses) {
+      const key = String(course.name ?? "").trim().toLowerCase();
+      const existing = dedupedByName.get(key);
+      if (!existing) {
+        dedupedByName.set(key, course);
+        continue;
+      }
+
+      const preferCurrent =
+        (course.enrolledCount ?? 0) > (existing.enrolledCount ?? 0) ||
+        ((course.enrolledCount ?? 0) === (existing.enrolledCount ?? 0) &&
+          Number(course.id) < Number(existing.id));
+
+      if (preferCurrent) {
+        dedupedByName.set(key, course);
+      }
+    }
+    const resultCourses = Array.from(dedupedByName.values());
 
     return new Response(
       superjson.stringify({

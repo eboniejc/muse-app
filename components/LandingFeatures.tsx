@@ -11,11 +11,13 @@ export const LandingFeatures = () => {
       icon: Mic2,
       title: t("features.practiceStudios"),
       description: t("features.practiceStudiosDesc"),
+      url: "https://store.museinc.com.vn/thue-phong-tap",
     },
     {
       icon: Disc,
       title: t("features.expertInstructors"),
       description: t("features.expertInstructorsDesc"),
+      url: "https://store.museinc.com.vn/giang-vien-1",
     },
     {
       icon: BarChart3,
@@ -26,6 +28,7 @@ export const LandingFeatures = () => {
       icon: Speaker,
       title: t("features.equipmentRental"),
       description: t("features.equipmentRentalDesc"),
+      url: "https://store.museinc.com.vn/thiet-bi",
     },
     {
       icon: CreditCard,
@@ -36,6 +39,7 @@ export const LandingFeatures = () => {
       icon: Phone,
       title: t("features.support"),
       description: t("features.supportDesc"),
+      url: "https://store.museinc.com.vn/lien-he",
     },
   ];
 
@@ -43,15 +47,32 @@ export const LandingFeatures = () => {
     <section className={styles.section}>
       <div className={styles.container}>
         <div className={styles.grid}>
-          {features.map((feature, index) => (
-            <div key={index} className={styles.card}>
-              <div className={styles.iconWrapper}>
-                <feature.icon size={32} />
+          {features.map((feature, index) => {
+            const inner = (
+              <>
+                <div className={styles.iconWrapper}>
+                  <feature.icon size={32} />
+                </div>
+                <h3 className={styles.title}>{feature.title}</h3>
+                <p className={styles.description}>{feature.description}</p>
+              </>
+            );
+            return feature.url ? (
+              <a
+                key={index}
+                href={feature.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${styles.card} ${styles.cardLink}`}
+              >
+                {inner}
+              </a>
+            ) : (
+              <div key={index} className={styles.card}>
+                {inner}
               </div>
-              <h3 className={styles.title}>{feature.title}</h3>
-              <p className={styles.description}>{feature.description}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

@@ -31,21 +31,15 @@ export const RoomList: React.FC<RoomListProps> = ({ selectedRoomId, onSelectRoom
           className={`${styles.card} ${selectedRoomId === room.id ? styles.selected : ""}`}
           onClick={() => onSelectRoom(room.id)}
         >
-          <div className={styles.header}>
-            <h3 className={styles.name}>{room.name}</h3>
-            <Badge variant={room.isActive ? "success" : "secondary"} className={styles.badge}>
-              {room.roomType}
-            </Badge>
-          </div>
-          <p className={styles.description}>{room.description}</p>
-          <div className={styles.meta}>
-            <div className={styles.metaItem}>
-              <Users size={14} />
-              <span>Cap: {room.capacity}</span>
-            </div>
-            <div className={styles.metaItem}>
-              <Speaker size={14} />
-              <span>{room.equipment?.length || 0} items</span>
+          {room.imageUrl && (
+            <img src={room.imageUrl} alt={room.name} className={styles.image} loading="lazy" />
+          )}
+          <div className={styles.body}>
+            <div className={styles.header}>
+              <h3 className={styles.name}>{room.name}</h3>
+              <Badge variant={room.isActive ? "success" : "secondary"} className={styles.badge}>
+                {room.roomType}
+              </Badge>
             </div>
           </div>
         </button>

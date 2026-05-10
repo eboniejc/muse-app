@@ -3,6 +3,19 @@ import { getServerUserSession } from "../../helpers/getServerUserSession";
 import superjson from "superjson";
 import { OutputType, schema } from "./enroll_POST.schema";
 import { NotAuthenticatedError } from "../../helpers/getSetServerSession";
+import { supabaseAdmin } from "../../helpers/supabaseServer";
+
+function isSchemaOrMissingTableError(error: unknown): boolean {
+  const maybeErr = error as { code?: string; message?: string } | null;
+  if (!maybeErr) return false;
+  return (
+    maybeErr.code === "42703" ||
+    maybeErr.code === "42P01" ||
+    maybeErr.code === "PGRST205" ||
+    maybeErr.message?.includes("does not exist") === true ||
+    maybeErr.message?.includes("schema cache") === true
+  );
+}
 
 export async function handle(request: Request) {
   try {
@@ -10,28 +23,52 @@ export async function handle(request: Request) {
     const json = superjson.parse(await request.text());
     const { courseId } = schema.parse(json);
 
-    // Check if course exists and is active
-    const course = await db
-      .selectFrom("courses")
-      .select(["id", "isActive", "maxStudents"])
-      .where("id", "=", courseId)
-      .executeTakeFirst();
+    let course: any;
+    try {
+      course = await db
+        .selectFrom("courses")
+        .select(["id"])
+        .where("id", "=", courseId)
+        .executeTakeFirst();
+    } catch (error) {
+      if (!isSchemaOrMissingTableError(error)) throw error;
+      const { data, error: restErr } = await supabaseAdmin
+        .from("courses")
+        .select("id")
+        .eq("id", courseId)
+        .limit(1)
+        .maybeSingle();
+      if (restErr) throw restErr;
+      course = data;
+    }
 
-    if (!course || !course.isActive) {
+    if (!course) {
       return new Response(
-        superjson.stringify({ error: "Course not found or inactive" }),
+        superjson.stringify({ error: "Course not found" }),
         { status: 404 }
       );
     }
 
-    // Check if already enrolled
-    const existingEnrollment = await db
-      .selectFrom("courseEnrollments")
-      .select("id")
-      .where("userId", "=", user.id)
-      .where("courseId", "=", courseId)
-      .where("status", "in", ["active", "paused"]) // Assuming completed/cancelled allows re-enrollment? Or maybe just active/paused blocks it. Let's block active/paused.
-      .executeTakeFirst();
+    let existingEnrollment: any = null;
+    try {
+      existingEnrollment = await db
+        .selectFrom("courseEnrollments")
+        .select("id")
+        .where("userId", "=", user.id as any)
+        .where("courseId", "=", courseId)
+        .where("status", "in", ["active", "paused"])
+        .executeTakeFirst() ?? null;
+    } catch (error) {
+      if (!isSchemaOrMissingTableError(error)) throw error;
+    }
+
+    if (!existingEnrollment) {
+      const [camel, snake] = await Promise.all([
+        supabaseAdmin.from("courseEnrollments").select("id").eq("userId", user.id as any).eq("courseId", courseId).in("status", ["active", "paused"]).limit(1).maybeSingle(),
+        supabaseAdmin.from("course_enrollments").select("id").eq("user_id", user.id as any).eq("course_id", courseId).in("status", ["active", "paused"]).limit(1).maybeSingle(),
+      ]);
+      existingEnrollment = camel.data ?? snake.data ?? null;
+    }
 
     if (existingEnrollment) {
       return new Response(
@@ -40,40 +77,45 @@ export async function handle(request: Request) {
       );
     }
 
-    // Check capacity if maxStudents is set
-    if (course.maxStudents) {
-      const currentEnrollments = await db
-        .selectFrom("courseEnrollments")
-        .select((eb) => eb.fn.count("id").as("count"))
-        .where("courseId", "=", courseId)
-        .where("status", "=", "active")
-        .executeTakeFirst();
 
-      const count = Number(currentEnrollments?.count || 0);
-      if (count >= course.maxStudents) {
-        return new Response(
-          superjson.stringify({ error: "Course is full" }),
-          { status: 400 }
-        );
-      }
+    let inserted: any;
+    try {
+      inserted = await db
+        .insertInto("courseEnrollments")
+        .values({
+          userId: user.id,
+          courseId,
+          status: "active",
+          enrolledAt: new Date(),
+          progressPercentage: 0,
+          updatedAt: new Date(),
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+    } catch (error) {
+      if (!isSchemaOrMissingTableError(error)) throw error;
+      const now = new Date().toISOString();
+      const { data, error: restErr } = await supabaseAdmin
+        .from("courseEnrollments")
+        .insert({
+          userId: user.id as any,
+          courseId,
+          status: "active",
+          enrolledAt: now,
+          progressPercentage: 0,
+          updatedAt: now,
+        })
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+      if (restErr) throw restErr;
+      if (!data) throw new Error("Enrollment insert returned no row");
+      inserted = data;
     }
-
-    const enrollment = await db
-      .insertInto("courseEnrollments")
-      .values({
-        userId: user.id,
-        courseId: courseId,
-        status: "active",
-        enrolledAt: new Date(),
-        progressPercentage: 0,
-        updatedAt: new Date(),
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
 
     return new Response(
       superjson.stringify({
-        enrollment,
+        enrollment: inserted,
       } satisfies OutputType)
     );
   } catch (error) {

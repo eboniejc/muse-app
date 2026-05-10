@@ -21,6 +21,7 @@ export type AdminEnrollment = {
   progressPercentage: number;
   completedLessons: number;
   lessonCompletions: { lessonNumber: number; completedAt: Date }[];
+  lessonSchedules: { lessonNumber: number; scheduledAt: Date }[];
 };
 
 export type OutputType = {

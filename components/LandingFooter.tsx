@@ -1,7 +1,8 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Music2, Facebook, Youtube, Instagram, MessageCircle } from "lucide-react";
+import { Facebook, Youtube, Instagram, MessageCircle } from "lucide-react";
 import { LanguageToggle } from "./LanguageToggle";
+import { BrandMark } from "./BrandMark";
 import styles from "./LandingFooter.module.css";
 
 export const LandingFooter = () => {
@@ -12,11 +13,10 @@ export const LandingFooter = () => {
       <div className={styles.container}>
         <div className={styles.column}>
           <div className={styles.brand}>
-            <Music2 className={styles.icon} />
-            <span className={styles.name}>MUSE INC</span>
+            <BrandMark size="lg" />
           </div>
           <p className={styles.description}>
-            The premier DJ school and professional audio equipment supplier in Vietnam.
+            The premier <span className={styles.inlineBrand}><BrandMark size="sm" /></span> and professional audio equipment supplier in Vietnam.
           </p>
           <div className={styles.socials}>
             <a href="#" className={styles.socialLink} aria-label="Facebook"><Facebook size={20} /></a>
@@ -38,7 +38,11 @@ export const LandingFooter = () => {
       </div>
       
       <div className={styles.bottomBar}>
-        <span className={styles.copyright}>© 2025 MUSE INC. All rights reserved.</span>
+        <div className={styles.copyright}>
+          <span>© 2025</span>
+          <BrandMark size="sm" />
+          <span>All rights reserved.</span>
+        </div>
         <div className={styles.languageToggle}>
           <LanguageToggle />
         </div>

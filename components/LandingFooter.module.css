@@ -43,6 +43,12 @@
   max-width: 300px;
 }
 
+.inlineBrand {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: 0 var(--spacing-1);
+}
+
 .socials {
   display: flex;
   gap: var(--spacing-4);
@@ -97,6 +103,10 @@
 .copyright {
   color: var(--muted-foreground);
   font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
 }
 
 .languageToggle {

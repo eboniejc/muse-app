@@ -53,7 +53,7 @@ export const PasswordRegisterForm: React.FC<PasswordRegisterFormProps> = ({
       const result = await postRegister(data);
       console.log("Registration successful for:", data.email);
       onLogin(result.user);
-      navigate("/complete-registration");
+      navigate("/dashboard");
     } catch (err) {
       console.error("Registration error:", err);
 
@@ -146,7 +146,7 @@ export const PasswordRegisterForm: React.FC<PasswordRegisterFormProps> = ({
             />
           </FormControl>
           <FormDescription>
-            At least 8 characters with uppercase, lowercase, and number
+            At least 6 characters.
           </FormDescription>
           <FormMessage />
         </FormItem>

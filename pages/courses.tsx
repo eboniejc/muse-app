@@ -3,6 +3,9 @@ import { Helmet } from "react-helmet";
 import { useTranslation } from "react-i18next";
 import { useCourses } from "../helpers/useCourses";
 import { CourseCard } from "../components/CourseCard";
+import { MembershipPassCard } from "../components/MembershipPassCard";
+import { MEMBERSHIP_PASSES } from "../helpers/membershipPasses";
+import { CourseWithDetails } from "../endpoints/courses/list_GET.schema";
 import { Input } from "../components/Input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/Select";
 import { Skeleton } from "../components/Skeleton";
@@ -14,8 +17,9 @@ export default function CoursesPage() {
   const { data: courses, isLoading } = useCourses();
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
+  const mergedCourses = courses ?? [];
 
-  const filteredCourses = courses?.filter(course => {
+  const filteredCourses = mergedCourses.filter(course => {
     const matchesSearch = course.name.toLowerCase().includes(search.toLowerCase()) || 
                           course.description?.toLowerCase().includes(search.toLowerCase());
     const matchesLevel = levelFilter === "all" || course.skillLevel?.toLowerCase() === levelFilter;
@@ -25,7 +29,7 @@ export default function CoursesPage() {
   return (
     <div className={styles.container}>
       <Helmet>
-        <title>Courses - DJ School</title>
+        <title>Courses - MUSE INC</title>
       </Helmet>
 
       <div className={styles.header}>
@@ -61,7 +65,7 @@ export default function CoursesPage() {
       </div>
 
       <div className={styles.grid}>
-        {isLoading ? (
+        {isLoading && mergedCourses.length === 0 ? (
           Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className={styles.skeletonCard}>
               <Skeleton className="h-8 w-3/4 mb-4" />
@@ -69,10 +73,15 @@ export default function CoursesPage() {
               <Skeleton className="h-10 w-full" />
             </div>
           ))
-        ) : filteredCourses && filteredCourses.length > 0 ? (
-          filteredCourses.map(course => (
-            <CourseCard key={course.id} course={course} />
-          ))
+        ) : filteredCourses.length > 0 ? (
+          <>
+            {filteredCourses.map(course => (
+              <CourseCard key={course.id} course={course} />
+            ))}
+            {MEMBERSHIP_PASSES.map((pass) => (
+              <MembershipPassCard key={pass.id} name={pass.name} price={pass.price} imageUrl={pass.imageUrl} />
+            ))}
+          </>
         ) : (
           <div className={styles.emptyState}>
             <p>{t('courses.noCourses')}</p>

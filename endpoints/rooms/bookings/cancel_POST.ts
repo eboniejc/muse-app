@@ -1,4 +1,4 @@
-import { db } from "../../../helpers/db";
+import { supabaseAdmin } from "../../../helpers/supabaseServer";
 import { getServerUserSession } from "../../../helpers/getServerUserSession";
 import superjson from "superjson";
 import { OutputType, schema } from "./cancel_POST.schema";
@@ -10,11 +10,11 @@ export async function handle(request: Request) {
     const json = superjson.parse(await request.text());
     const { bookingId } = schema.parse(json);
 
-    const booking = await db
-      .selectFrom("roomBookings")
-      .select(["userId", "status"])
-      .where("id", "=", bookingId)
-      .executeTakeFirst();
+    const { data: booking } = await supabaseAdmin
+      .from("room_bookings")
+      .select("user_id, status")
+      .eq("id", bookingId)
+      .maybeSingle();
 
     if (!booking) {
       return new Response(
@@ -23,8 +23,7 @@ export async function handle(request: Request) {
       );
     }
 
-    // Only allow cancellation if user owns the booking or is an admin
-    if (booking.userId !== user.id && user.role !== "admin") {
+    if (String(booking.user_id) !== String(user.id) && user.role !== "admin") {
       return new Response(
         superjson.stringify({ error: "Not authorized to cancel this booking" }),
         { status: 403 }
@@ -38,26 +37,32 @@ export async function handle(request: Request) {
       );
     }
 
-    const updatedBooking = await db
-      .updateTable("roomBookings")
-      .set({
-        status: "cancelled",
-        updatedAt: new Date(),
-      })
-      .where("id", "=", bookingId)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    const { data: row, error: updateErr } = await supabaseAdmin
+      .from("room_bookings")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("id", bookingId)
+      .select("*")
+      .single();
+    if (updateErr) throw updateErr;
+
+    const updatedBooking = {
+      id: row.id,
+      userId: row.user_id,
+      roomId: row.room_id,
+      startTime: new Date(row.start_time),
+      endTime: new Date(row.end_time),
+      status: row.status,
+      notes: row.notes,
+      createdAt: row.created_at ? new Date(row.created_at) : null,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : null,
+    };
 
     return new Response(
-      superjson.stringify({
-        booking: updatedBooking,
-      } satisfies OutputType)
+      superjson.stringify({ booking: updatedBooking } satisfies OutputType)
     );
   } catch (error) {
     if (error instanceof NotAuthenticatedError) {
-      return new Response(superjson.stringify({ error: "Not authenticated" }), {
-        status: 401,
-      });
+      return new Response(superjson.stringify({ error: "Not authenticated" }), { status: 401 });
     }
     console.error("Error cancelling booking:", error);
     return new Response(

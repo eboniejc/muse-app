@@ -4,9 +4,10 @@ import { Selectable } from "kysely";
 import { RoomBookings } from "../../../helpers/schema";
 
 export const schema = z.object({
-  roomId: z.number().optional(),
+  roomId: z.coerce.number().optional(),
   startDate: z.date().optional(),
   endDate: z.date().optional(),
+  mine: z.boolean().optional(),
 });
 
 export type BookingWithDetails = Pick<
@@ -32,6 +33,7 @@ export const getRoomBookings = async (
     searchParams.set("startDate", params.startDate.toISOString());
   if (params.endDate)
     searchParams.set("endDate", params.endDate.toISOString());
+  if (params.mine) searchParams.set("mine", "true");
 
   const result = await fetch(`/_api/rooms/bookings/list?${searchParams.toString()}`, {
     method: "GET",

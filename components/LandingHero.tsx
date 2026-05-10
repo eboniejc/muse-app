@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "./Button";
 import { useAuth } from "../helpers/useAuth";
+import { BrandMark } from "./BrandMark";
 import styles from "./LandingHero.module.css";
 
 export const LandingHero = () => {
@@ -13,9 +14,9 @@ export const LandingHero = () => {
   return (
     <section className={styles.hero}>
       <div className={styles.content}>
-        <h1 className={styles.headline}>
-          MUSE <span className={styles.highlight}>INC</span>
-        </h1>
+        <div className={styles.headline}>
+          <BrandMark size="xl" />
+        </div>
         <p className={styles.tagline}>{t("landing.heroTitle")}</p>
         <p className={styles.subheadline}>{t("landing.heroSubtitle")}</p>
         <div className={styles.ctaGroup}>
