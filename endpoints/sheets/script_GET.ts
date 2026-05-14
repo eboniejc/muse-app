@@ -384,14 +384,19 @@ function syncToCalendar() {
       sendUpdates: 'all'
     };
     var existingEv = tagMap[tag];
-    if (existingEv) {
-      Calendar.Events.patch(eventBody, calId, existingEv.id);
-      updated++;
-    } else {
-      Calendar.Events.insert(eventBody, calId);
-      created++;
+    var attempts = 0;
+    while (attempts < 3) {
+      try {
+        if (existingEv) { Calendar.Events.patch(eventBody, calId, existingEv.id); updated++; }
+        else { Calendar.Events.insert(eventBody, calId); created++; }
+        break;
+      } catch(e) {
+        attempts++;
+        if (attempts >= 3) throw e;
+        Utilities.sleep(5000 * attempts); // 5s, then 10s before giving up
+      }
     }
-    Utilities.sleep(200);
+    Utilities.sleep(1500);
   });
 
   // ── Delete orphaned events (events with [muse:N:N] tags no longer in sheet) ──
@@ -462,9 +467,19 @@ function syncEventsToCalendar() {
       sendUpdates: 'all'
     };
     var ex = tagMap[tag];
-    if (ex) { Calendar.Events.patch(eventBody, calId, ex.id); }
-    else { Calendar.Events.insert(eventBody, calId); }
-    Utilities.sleep(200);
+    var attempts = 0;
+    while (attempts < 3) {
+      try {
+        if (ex) { Calendar.Events.patch(eventBody, calId, ex.id); }
+        else { Calendar.Events.insert(eventBody, calId); }
+        break;
+      } catch(e) {
+        attempts++;
+        if (attempts >= 3) throw e;
+        Utilities.sleep(5000 * attempts);
+      }
+    }
+    Utilities.sleep(1500);
     currentTags[tag] = true;
   });
 
