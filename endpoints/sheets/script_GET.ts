@@ -331,10 +331,11 @@ function syncToCalendar() {
   if (!calendar) { ui.alert('Calendar not found', 'Run Setup Google Calendar again.', ui.ButtonSet.OK); return; }
 
   var rows = _readLessonsSheet();
+  var now = new Date();
   var created = 0, updated = 0;
 
-  // Pre-fetch all muse-tagged events once so date changes are found regardless of old date
-  var scanFrom = new Date();
+  // Pre-fetch all muse-tagged events — 3 months back so past lessons patch instead of re-insert
+  var scanFrom = new Date(); scanFrom.setMonth(scanFrom.getMonth() - 3);
   var scanTo   = new Date(); scanTo.setFullYear(scanTo.getFullYear() + 1);
   var allEvents = (Calendar.Events.list(calId, {
     timeMin: scanFrom.toISOString(),
@@ -375,15 +376,19 @@ function syncToCalendar() {
     var guests = [row.email, 'museincproperty@gmail.com', row.instructor].filter(Boolean);
 
     var attendees = guests.map(function(em) { return { email: em }; });
+    var existingEv = tagMap[tag];
+
+    // Past event already on calendar — nothing to update, skip the API call entirely
+    if (existingEv && start < now) { updated++; return; }
+
     var eventBody = {
       summary: title,
       start:   { dateTime: start.toISOString(), timeZone: VN_TZ },
       end:     { dateTime: end.toISOString(),   timeZone: VN_TZ },
       description: lines.join('\\n'),
       attendees: attendees,
-      sendUpdates: 'all'
+      sendUpdates: existingEv ? 'none' : 'all'
     };
-    var existingEv = tagMap[tag];
     var attempts = 0;
     while (attempts < 3) {
       try {
@@ -392,8 +397,10 @@ function syncToCalendar() {
         break;
       } catch(e) {
         attempts++;
+        var msg = String(e && e.message || e);
+        if (msg.indexOf('usage limits') !== -1 || msg.indexOf('quota') !== -1) throw e;
         if (attempts >= 3) throw e;
-        Utilities.sleep(5000 * attempts); // 5s, then 10s before giving up
+        Utilities.sleep(5000 * attempts);
       }
     }
     Utilities.sleep(1500);
@@ -435,8 +442,8 @@ function syncEventsToCalendar() {
   var calId = props.getProperty('CALENDAR_ID'); if (!calId) return;
   var calendar = CalendarApp.getCalendarById(calId); if (!calendar) return;
 
-  // Pre-fetch all muse_event-tagged events once so date changes are found regardless of old date
-  var scanFrom = new Date();
+  // Pre-fetch all muse_event-tagged events — 3 months back so past events patch instead of re-insert
+  var scanFrom = new Date(); scanFrom.setMonth(scanFrom.getMonth() - 3);
   var scanTo   = new Date(); scanTo.setFullYear(scanTo.getFullYear() + 1);
   var allEvents = (Calendar.Events.list(calId, {
     timeMin: scanFrom.toISOString(),
@@ -451,6 +458,7 @@ function syncEventsToCalendar() {
     if (match) tagMap[match[0]] = ev;
   });
 
+  var now = new Date();
   var currentTags = {};
   _readEventsSheet().forEach(function(row) {
     if (!row.title || !row.startAt) return;
@@ -458,15 +466,19 @@ function syncEventsToCalendar() {
     var end = row.endAt ? new Date(row.endAt) : new Date(start.getTime() + 7200000);
     var tag = '[muse_event:' + row.id + ']';
     var desc = (row.caption || '') + '\\n' + tag;
+    var ex = tagMap[tag];
+
+    // Past event already on calendar — skip
+    if (ex && start < now) { currentTags[tag] = true; return; }
+
     var eventBody = {
       summary: row.title,
       start:   { dateTime: start.toISOString(), timeZone: VN_TZ },
       end:     { dateTime: end.toISOString(),   timeZone: VN_TZ },
       description: desc,
       attendees: [{ email: 'museincproperty@gmail.com' }],
-      sendUpdates: 'all'
+      sendUpdates: ex ? 'none' : 'all'
     };
-    var ex = tagMap[tag];
     var attempts = 0;
     while (attempts < 3) {
       try {
@@ -475,6 +487,8 @@ function syncEventsToCalendar() {
         break;
       } catch(e) {
         attempts++;
+        var msg = String(e && e.message || e);
+        if (msg.indexOf('usage limits') !== -1 || msg.indexOf('quota') !== -1) throw e;
         if (attempts >= 3) throw e;
         Utilities.sleep(5000 * attempts);
       }
